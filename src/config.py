@@ -1,5 +1,7 @@
+"""Configuration : chargement des variables d'environnement et chemins"""
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 load_dotenv()
