@@ -1,0 +1,673 @@
+# Eval set v0 — PrevCorp Agent
+# Phase 0 — collecte initiale
+# Source : questions réelles collectées auprès de gestionnaires (anonymisées et adaptées au schéma PrevCorp)
+# Format : question brute → catégorie → difficulté → scope → statut
+
+meta:
+  version: "0.1"
+  date: "2025"
+  total: 63
+  categories:
+    - agregation
+    - liste
+    - filtrage_temporel
+    - filtrage_entite
+    - top_n
+    - multi_criteres
+    - dossier_individuel
+    - rag
+    - ambigue
+    - hors_scope
+  difficultes:
+    - easy       # 1 table, 1 filtre
+    - medium     # 2-3 tables, jointure simple
+    - hard       # jointures multiples, conditions complexes, négations
+  compare_modes:
+    - scalar        # 1 cellule, valeur exacte
+    - row_count     # nombre de lignes identique
+    - key_set       # ensemble de clés identique (top_n)
+    - exact_sorted  # tri sur key_column + comparaison valeurs
+    - skip          # rag / hors_scope — pas d'évaluation SQL
+
+questions:
+
+  # ─────────────────────────────────────────────
+  # AGREGATION
+  # ─────────────────────────────────────────────
+
+  - id: Q012
+    question: "Combien avons-nous d'assurés non fiscalisés en France, à date ?"
+    categorie: agregation
+    difficulte: easy
+    scope: sql
+    compare: scalar
+    tables: [dim__assures]
+    note: "COUNT sur attestation_fiscale_etranger = true"
+    reference_sql: "SELECT COUNT(*) FROM dim__assures WHERE attestation_fiscale_etranger = True"
+
+  - id: Q034
+    question: "Combien de dossiers ont été indemnisés au moins 1 fois en 2025 ?"
+    categorie: agregation
+    difficulte: medium
+    scope: sql
+    compare: scalar
+    tables: [fct__dossiers, fct__paiements]
+    note: "COUNT DISTINCT dossier_id dans fct__paiements filtré sur YEAR=2025 — pas de jointure nécessaire"
+    reference_sql: "SELECT COUNT(DISTINCT dossier_id) FROM fct__paiements WHERE YEAR(paiement_date)=2025"
+
+  - id: Q044
+    question: "Compte le nombre de dossiers créés en 2024, répartis par entreprise et par risque."
+    categorie: agregation
+    difficulte: medium
+    scope: sql
+    compare: exact_sorted
+    key_column: entreprise_nom
+    tables: [fct__dossiers]
+    note: "GROUP BY entreprise_id, risque avec filtre creation_date"
+    reference_sql: "SELECT entreprise_nom, risque, count(*) FROM fct__dossiers WHERE YEAR(creation_date)=2024 GROUP BY entreprise_nom, risque ORDER BY entreprise_nom, risque"
+
+  - id: Q045
+    question: "À quelle période de l'année a-t-on le plus d'activité en cotisations et en prestations ?"
+    categorie: agregation
+    difficulte: hard
+    scope: sql
+    compare: exact_sorted
+    key_column: mois
+    tables: [fct__cotisations, fct__paiements]
+    note: "Agrégation par mois sur deux tables — question analytique ouverte"
+    reference_sql: "SELECT mois, SUM(nb_cotisations) AS nb_cotisations, SUM(nb_prestations) AS nb_prestations, SUM(nb_cotisations) + SUM(nb_prestations) AS activite_totale FROM ( SELECT MONTH(encaissement_date) AS mois, COUNT(*) AS nb_cotisations, 0 AS nb_prestations FROM fct__cotisations GROUP BY mois UNION ALL SELECT MONTH(paiement_date) AS mois, 0 AS nb_cotisations, COUNT(*) AS nb_prestations FROM fct__paiements GROUP BY mois ) GROUP BY mois ORDER BY activite_totale DESC"
+
+  - id: Q012b
+    question: "Quel est le montant total des prestations versées depuis le début de l'année 2025 ?"
+    categorie: agregation
+    difficulte: easy
+    scope: sql
+    compare: scalar
+    tables: [fct__paiements]
+    note: "SUM(brut_montant) filtré sur paiement_date >= 01/01/2025"
+    reference_sql: "SELECT sum(brut_montant) FROM fct__paiements WHERE paiement_date >= '2025-01-01'"
+
+  # ─────────────────────────────────────────────
+  # LISTE
+  # ─────────────────────────────────────────────
+
+  - id: Q003
+    question: "Peux-tu me faire une extraction des invalidités en cours pour Martinez SA : cadres = C42495 et non-cadres = C63218 ?"
+    categorie: liste
+    difficulte: medium
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers, dim__contrats, dim__entreprises]
+    note: "Filtre sur risque=Invalidité, est_en_cours=true, deux contrats distincts"
+    reference_sql: "SELECT * FROM fct__dossiers WHERE risque = 'Invalidité' AND est_en_cours = TRUE AND contrat_numero IN ('C42495', 'C63218')"
+
+  - id: Q007
+    question: "Liste exhaustive des sinistres en cours de versement en 2024, ayant un fait générateur antérieur au 01/01/2024."
+    categorie: liste
+    difficulte: hard
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers, fct__paiements]
+    note: "Fait générateur < 2024 ET paiement en 2024"
+    reference_sql: "SELECT DISTINCT d.dossier_numero, d.risque, d.nature_arret, d.salaire_montant, d.creation_date, d.fait_generateur_date, d.etat_date, d.etat_motif, d.est_en_cours, d.attest_non_activite_date, d.justif_ss_date, d.duree_dossier_jours, d.assure_nom, d.assure_prenom, d.pays_code, d.entreprise_nom, d.entreprise_est_en_cours, d.contrat_numero, d.contrat_type, d.segment_nom FROM fct__dossiers AS d JOIN fct__paiements AS p USING(dossier_id) WHERE fait_generateur_date < '2024-01-01' AND YEAR(paiement_date) = 2024"
+
+  - id: Q008
+    question: "Peux-tu sortir le nom et l'adresse des affiliés habitant à l'étranger et indiquer si des prestations (incapacité, invalidité et décès) sont en cours ou non ?"
+    categorie: liste
+    difficulte: hard
+    scope: sql
+    compare: row_count
+    tables: [dim__assures, fct__dossiers]
+    note: "pays_code != FR, jointure avec dossiers pour statut en cours"
+    reference_sql: "SELECT a.nom, a.prenom, a.adresse, a.pays_code, MAX(CASE WHEN d.risque = 'Incapacité'  AND d.est_en_cours = TRUE THEN 1 ELSE 0 END) AS incapacite_en_cours, MAX(CASE WHEN d.risque = 'Invalidité'  AND d.est_en_cours = TRUE THEN 1 ELSE 0 END) AS invalidite_en_cours, MAX(CASE WHEN d.risque IN ('Décès', 'Rente viagère', 'Rente éducation') AND d.est_en_cours = TRUE THEN 1 ELSE 0 END) AS rente_deces_en_cours FROM dim__assures AS a LEFT JOIN fct__dossiers AS d USING(assure_id) WHERE a.pays_code != 'FR' GROUP BY a.nom, a.prenom, a.adresse, a.pays_code ORDER BY a.nom, a.prenom"
+
+  - id: Q009
+    question: "Peux-tu sortir la liste des affiliés qui ont une attestation fiscale étranger et indiquer si des prestations sont en cours ou non ?"
+    categorie: liste
+    difficulte: hard
+    scope: sql
+    compare: row_count
+    tables: [dim__assures, fct__dossiers]
+    note: "attestation_fiscale_etranger=true, jointure dossiers"
+    reference_sql: "SELECT a.nom, a.prenom, a.adresse, a.pays_code, MAX(CASE WHEN d.est_en_cours = TRUE THEN 1 ELSE 0 END) AS prestation_en_cours FROM dim__assures AS a LEFT JOIN fct__dossiers AS d USING(assure_id) WHERE a.attestation_fiscale_etranger = TRUE GROUP BY a.nom, a.prenom, a.adresse, a.pays_code ORDER BY a.nom, a.prenom"
+
+  - id: Q017
+    question: "Extraction de tous les dossiers en cours pour les contrats suivants : CADRE C90356 et NON CADRE C96787."
+    categorie: liste
+    difficulte: easy
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers]
+    note: "Filtre est_en_cours=true + contrat_numero IN (...) — deux contrats cadre/non-cadre"
+    reference_sql: "SELECT * FROM fct__dossiers WHERE est_en_cours = true AND contrat_numero IN ('C90356', 'C96787')"
+
+  - id: Q022
+    question: "Contrat Bonnin : fournir un état des dossiers prévoyance en cours."
+    categorie: liste
+    difficulte: easy
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers]
+    note: "Filtre est_en_cours=true + entreprise_nom — dossiers actifs d'une entreprise"
+    reference_sql: "SELECT * FROM fct__dossiers WHERE est_en_cours = true AND entreprise_nom = 'Bonnin'"
+
+  - id: Q023
+    question: "Extraction de tous les dossiers existants sur l'entreprise Bonnin contrat C83792."
+    categorie: liste
+    difficulte: easy
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers]
+    note: "Filtre entreprise_nom + contrat_numero — tous dossiers y compris clôturés, pas de filtre est_en_cours"
+    reference_sql: "SELECT * FROM fct__dossiers WHERE entreprise_nom = 'Bonnin' AND contrat_numero = 'C83792'"
+
+  - id: Q025
+    question: "Dans notre segment Boucherie artisanale, il y a des contrats ouverts avec des entreprises fermées. Peux-tu nous sortir une extraction ?"
+    categorie: liste
+    difficulte: easy
+    scope: sql
+    compare: row_count
+    tables: [fct__contrats_entreprises]
+    note: "Jointure fct__contrats_entreprises/dim__contrats — contrat_est_en_cours=true ET entreprise_est_en_cours=false + filtre segment"
+    reference_sql: "SELECT ce.*, c.segment_nom FROM fct__contrats_entreprises AS ce JOIN dim__contrats AS c USING(contrat_id) WHERE ce.contrat_est_en_cours = true AND ce.entreprise_est_en_cours = false AND c.segment_nom = 'Boucherie artisanale'"
+
+  - id: Q032
+    question: "Transmettre un fichier avec tous les paiements envoyés en 2025 avec la date d'envoi."
+    categorie: liste
+    difficulte: easy
+    scope: sql
+    compare: row_count
+    tables: [fct__paiements]
+    note: "Filtre YEAR(paiement_date) = 2025 — extraction brute sans jointure"
+    reference_sql: "SELECT * FROM fct__paiements WHERE YEAR(paiement_date) = 2025"
+
+  - id: Q039
+    question: "Extraction des contrats suivants [NUM_CONTRAT] [NUM_CONTRAT] [NUM_CONTRAT] — liste des arrêts encore en cours d'indemnisation."
+    categorie: liste
+    difficulte: easy
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers]
+    note: "Filtre contrat_numero IN (...) + risque=Incapacité + est_en_cours=true — trois contrats"
+    reference_sql: "SELECT * FROM fct__dossiers WHERE contrat_numero IN ('C10150', 'C10205', 'C10425') AND risque = 'Incapacité' AND est_en_cours = TRUE"
+
+  - id: Q049
+    question: "Extraction de suivi des invalidités [NOM_CONTRAT]."
+    categorie: liste
+    difficulte: easy
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers]
+    note: "Filtre risque=Invalidité pour un contrat donné"
+    reference_sql: "SELECT * FROM fct__dossiers WHERE entreprise_nom = 'Allard' AND risque = 'Invalidité'"
+
+  - id: Q062
+    question: "Liste des rentes éducation pour les bénéficiaires qui vont avoir 18 ans cette année."
+    categorie: liste
+    difficulte: medium
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers, dim__beneficiaires]
+    note: "YEAR(naissance_date) = YEAR(current_date) - 18"
+    reference_sql: "SELECT * FROM fct__dossiers d JOIN dim__beneficiaires b USING(dossier_id) WHERE d.risque = 'Rente éducation' AND YEAR(b.naissance_date) = YEAR(CURRENT_DATE) - 18"
+
+  - id: Q063
+    question: "Liste des dossiers d'invalidité qui n'ont qu'une rente SS en ressource."
+    categorie: liste
+    difficulte: hard
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers, fct__ressources]
+    note: "Dossiers invalidité dont toutes les ressources sont de type Rente SS"
+    reference_sql: "SELECT * FROM fct__dossiers AS d JOIN fct__ressources AS r ON r.dossier_id = d.dossier_id AND r.ressource_type = 'Rente SS' WHERE d.risque = 'Invalidité' AND NOT EXISTS ( SELECT 1 FROM fct__ressources r2 WHERE r2.dossier_id     = d.dossier_id AND r2.ressource_type != 'Rente SS')"
+
+  - id: Q064
+    question: "Liste des dossiers d'invalidité qui ont au moins une rente SS en ressource."
+    categorie: liste
+    difficulte: medium
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers, fct__ressources]
+    note: "Jointure dossiers/ressources — filtre risque=Invalidité + ressource_type=Rente SS, sans exclusion des autres types (complémentaire de Q063)"
+    reference_sql: "SELECT * FROM fct__dossiers AS d JOIN fct__ressources AS r USING(dossier_id) WHERE d.risque = 'Invalidité' AND r.ressource_type = 'Rente SS'"
+
+  # ─────────────────────────────────────────────
+  # FILTRAGE TEMPOREL
+  # ─────────────────────────────────────────────
+
+  - id: Q006
+    question: "Récapitulatif des sommes versées depuis 2023 (date d'adhésion) pour l'ensemble des salariés en arrêt. Contrat C74382."
+    categorie: filtrage_temporel
+    difficulte: medium
+    scope: sql
+    compare: exact_sorted
+    key_column: assure_nom
+    tables: [fct__paiements, fct__dossiers]
+    note: "Triple jointure paiements/dossiers/contrats — SUM montants GROUP BY assuré, filtre contrat_numero + risque=Incapacité + année adhésion 2023"
+    reference_sql: "SELECT p.assure_nom, p.assure_prenom, d.risque, COUNT(DISTINCT p.dossier_id) AS nb_dossiers, SUM(p.brut_montant) AS total_brut, SUM(p.net_montant) AS total_net, MIN(p.paiement_date) AS premier_paiement, MAX(p.paiement_date) AS dernier_paiement FROM fct__paiements p JOIN fct__dossiers d ON d.dossier_id = p.dossier_id JOIN dim__contrats c ON c.contrat_id = p.contrat_id WHERE c.contrat_numero = 'C74382' AND d.risque = 'Incapacité' AND YEAR(c.debut_date) = 2023 GROUP BY p.assure_nom, p.assure_prenom, d.risque"
+
+  - id: Q015
+    question: "Extraction des encours du segment [NOM_SEGMENT] au 31/12/2024 pour une reprise par un nouvel assureur."
+    categorie: filtrage_temporel
+    difficulte: hard
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers, dim__contrats]
+    note: "Dossiers en cours à une date passée précise — logique de snapshot"
+    reference_sql: "SELECT * FROM fct__dossiers WHERE segment_nom = 'Commerce de détail' AND fait_generateur_date <= '2024-12-31' AND (etat_date IS NULL OR etat_date > '2024-12-31')"
+
+  - id: Q033
+    question: "Transmettre les règlements de novembre et décembre 2024."
+    categorie: filtrage_temporel
+    difficulte: easy
+    scope: sql
+    compare: row_count
+    tables: [fct__paiements]
+    note: "Filtre paiement_date entre novembre et décembre 2024 — plage de dates explicite"
+    reference_sql: "SELECT * FROM fct__paiements WHERE paiement_date >= '2024-11-01' AND paiement_date <= '2024-12-31'"
+
+  - id: Q037
+    question: "Extraction de tous les paiements effectués (incapacité) depuis janvier 2025. Contrat C88139."
+    categorie: filtrage_temporel
+    difficulte: medium
+    scope: sql
+    compare: row_count
+    tables: [fct__paiements, fct__dossiers]
+    note: "Jointure paiements/contrats — filtre contrat_numero + risque=Incapacité + paiement_date >= 01/01/2025"
+    reference_sql: "SELECT p.* FROM fct__paiements AS p JOIN dim__contrats AS c USING(contrat_id) WHERE c.contrat_numero  = 'C88139' AND p.risque = 'Incapacité' AND p.paiement_date >= '2025-01-01'"
+
+  - id: Q047
+    question: "Relevés de prestation pour les contrats C80010 C49529 C10772 pour l'année 2023/2024/2025."
+    categorie: filtrage_temporel
+    difficulte: medium
+    scope: sql
+    compare: row_count
+    tables: [fct__paiements, dim__contrats]
+    note: "Jointure paiements/contrats — filtre contrat_numero IN (...) + YEAR(paiement_date) IN (2023, 2024, 2025)"
+    reference_sql: "SELECT * FROM fct__paiements AS p JOIN dim__contrats AS c USING(contrat_id) WHERE c.contrat_numero IN ('C80010', 'C49529', 'C10772') AND YEAR(p.paiement_date) IN (2023, 2024, 2025)"
+
+  - id: Q057
+    question: "Liste des contrats pour lesquels nous n'avons rien perçu en 2025."
+    categorie: filtrage_temporel
+    difficulte: hard
+    scope: sql
+    compare: row_count
+    tables: [fct__cotisations, dim__contrats]
+    note: "Contrats actifs sans aucune cotisation sur la période"
+    reference_sql: "WITH cte_cot_25 AS (SELECT * FROM fct__cotisations WHERE YEAR(echeance_date) = 2025) SELECT * FROM dim__contrats AS c LEFT JOIN cte_cot_25 AS cot USING (contrat_id) WHERE cot.contrat_id IS NULL"
+
+  - id: Q058
+    question: "Liste des contrats pour lesquels nous n'avons rien perçu au T1 2025."
+    categorie: filtrage_temporel
+    difficulte: hard
+    scope: sql
+    compare: row_count
+    tables: [fct__cotisations, dim__contrats]
+    note: "CTE + LEFT JOIN anti-match — contrats sans cotisation au T1 2025 (mois 1, 2, 3)"
+    reference_sql: "WITH cte_cot_t1_25 AS (SELECT * FROM fct__cotisations WHERE YEAR(echeance_date) = 2025 AND MONTH(echeance_date) IN (1, 2, 3)) SELECT * FROM dim__contrats AS c LEFT JOIN cte_cot_t1_25 AS cot USING (contrat_id) WHERE cot.contrat_id IS NULL"
+
+  - id: Q059
+    question: "Des prestations supplémentaires ont-elles été versées au-delà du 01/03/2025 ?"
+    categorie: filtrage_temporel
+    difficulte: easy
+    scope: sql
+    compare: row_count
+    tables: [fct__paiements]
+    note: "Filtre simple paiement_date >= '2025-03-01' — question de vérification ponctuelle"
+    reference_sql: "SELECT * FROM fct__paiements WHERE paiement_date >= '2025-03-01'"
+
+  - id: Q024
+    question: "Liste des capitaux réglés au T1 2025 avec la donnée salaire."
+    categorie: filtrage_temporel
+    difficulte: medium
+    scope: sql
+    compare: row_count
+    tables: [fct__paiements, fct__dossiers]
+    note: "Jointure paiements/dossiers — risque=Décès + paiement_date BETWEEN T1 2025 + tri chronologique"
+    reference_sql: "SELECT * FROM fct__paiements AS p JOIN fct__dossiers AS d USING(dossier_id) WHERE d.risque = 'Décès' AND p.paiement_date BETWEEN '2025-01-01' AND '2025-03-31' ORDER BY p.paiement_date"
+
+  # ─────────────────────────────────────────────
+  # FILTRAGE ENTITE
+  # ─────────────────────────────────────────────
+
+  - id: Q005
+    question: "Dossiers DC en cours sur les contrats du segment Métallurgie."
+    categorie: filtrage_entite
+    difficulte: medium
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers, dim__contrats]
+    note: "Filtre risque=Décès, est_en_cours=true, segment donné"
+    reference_sql: "SELECT * FROM fct__dossiers WHERE segment_nom = 'Métallurgie' AND risque = 'Décès' AND est_en_cours = TRUE"
+
+  - id: Q020
+    question: "Liste des contrats en cours et résiliés, de l'entreprise Monnier."
+    categorie: filtrage_entite
+    difficulte: easy
+    scope: sql
+    compare: row_count
+    tables: [dim__contrats]
+    note: "Jointure fct__contrats_entreprises/dim__contrats — sans filtre est_en_cours, tous statuts confondus"
+    reference_sql: "SELECT * FROM fct__contrats_entreprises AS ce JOIN dim__contrats AS c USING(contrat_id) WHERE ce.entreprise_nom = 'Monnier'"
+
+  - id: Q021
+    question: "Liste des contrats en cours au 31/12/2014, de l'entreprise Muller."
+    categorie: filtrage_entite
+    difficulte: medium
+    scope: sql
+    compare: row_count
+    tables: [dim__contrats]
+    note: "Snapshot au 31/12/2014 — debut_date <= date ET (fin_date IS NULL OR fin_date > date)"
+    reference_sql: "SELECT * FROM fct__contrats_entreprises AS ce JOIN dim__contrats AS c USING(contrat_id) WHERE ce.entreprise_nom = 'Muller' AND c.debut_date <= '2014-12-31' AND (c.fin_date IS NULL OR c.fin_date > '2014-12-31')"
+
+  - id: Q038
+    question: "Extraction des dossiers pour lesquels un règlement a été effectué depuis 2024 sur les contrats [NUM_CONTRAT] et [NUM_CONTRAT]."
+    categorie: filtrage_entite
+    difficulte: medium
+    scope: sql
+    compare: row_count
+    tables: [fct__paiements, fct__dossiers]
+    note: "DISTINCT dossiers ayant reçu au moins un paiement depuis 2024 — filtre sur deux contrats"
+    reference_sql: "SELECT DISTINCT d.* FROM fct__paiements AS p JOIN fct__dossiers AS d USING(dossier_id) WHERE d.contrat_numero IN ('C23224', 'C82845') AND p.paiement_date >= '2024-01-01'"
+
+  - id: Q040
+    question: "Extraction pour les dossiers du SIRET 93917251355215 avec un règlement depuis le 01/09/2024."
+    categorie: filtrage_entite
+    difficulte: medium
+    scope: sql
+    compare: row_count
+    tables: [fct__paiements, fct__dossiers, dim__entreprises]
+    note: "Triple jointure paiements/dossiers/entreprises — filtre SIRET + paiement_date >= 01/09/2024"
+    reference_sql: "SELECT DISTINCT d.* FROM fct__paiements AS p JOIN fct__dossiers AS d USING(dossier_id) JOIN dim__entreprises AS e ON e.entreprise_id = d.entreprise_id WHERE e.SIRET = '93917251355215' AND p.paiement_date >= '2024-09-01'"
+
+  - id: Q046
+    question: "Rentes du segment Santé et action sociale."
+    categorie: filtrage_entite
+    difficulte: easy
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers, dim__contrats]
+    note: "Filtre risque IN (Rente viagère, Rente éducation) + segment_nom — table dénormalisée, pas de jointure"
+    reference_sql: "SELECT * FROM fct__dossiers WHERE risque IN ('Rente viagère', 'Rente éducation') AND segment_nom = 'Santé et action sociale'"
+
+  - id: Q054
+    question: "Extraction des cotisations et des prestations pour les contrats C42302 C57453 C45838."
+    categorie: filtrage_entite
+    difficulte: medium
+    scope: sql
+    compare: row_count
+    tables: [fct__cotisations, fct__paiements, dim__contrats]
+    note: "UNION ALL cotisations et paiements avec colonnes harmonisées (type, date, montant, risque) — schéma unifié pour les deux flux"
+    reference_sql: "SELECT 'cotisation' AS type, contrat_numero, encaissement_date AS date, cotisation_montant AS montant, NULL AS risque FROM fct__cotisations WHERE contrat_numero IN ('C42302', 'C57453', 'C45838') UNION ALL SELECT 'prestation' AS type, c.contrat_numero, p.paiement_date AS date, p.brut_montant AS montant, p.risque FROM fct__paiements AS p JOIN dim__contrats AS c USING(contrat_id) WHERE c.contrat_numero IN ('C42302', 'C57453', 'C45838') ORDER BY type, contrat_numero, date"
+
+  - id: Q061
+    question: "Liste des paiements sur le contrat Coste."
+    categorie: filtrage_entite
+    difficulte: easy
+    scope: sql
+    compare: row_count
+    tables: [fct__paiements, fct__dossiers]
+    note: "Jointure paiements/dossiers — filtre entreprise_nom, tous paiements confondus"
+    reference_sql: "SELECT p.* FROM fct__paiements AS p JOIN fct__dossiers AS d USING(dossier_id) WHERE d.entreprise_nom = 'Coste'"
+
+  # ─────────────────────────────────────────────
+  # TOP N
+  # ─────────────────────────────────────────────
+
+  - id: Q018
+    question: "Peux-tu me sortir le top 10 des salaires ?"
+    categorie: top_n
+    difficulte: easy
+    scope: sql
+    compare: key_set
+    key_column: dossier_id
+    tables: [fct__dossiers]
+    note: "ORDER BY salaire_montant DESC LIMIT 10"
+    reference_sql: "SELECT * FROM fct__dossiers ORDER BY salaire_montant DESC LIMIT 10"
+
+  - id: Q019
+    question: "Extraction des 10 rentes DC en cours avec les plus gros salaires."
+    categorie: top_n
+    difficulte: medium
+    scope: sql
+    compare: key_set
+    key_column: dossier_id
+    tables: [fct__dossiers]
+    note: "Filtre risque IN (Rente viagère, Rente éducation), est_en_cours=true, TOP 10"
+    reference_sql: "SELECT * FROM fct__dossiers WHERE risque IN ('Rente viagère', 'Rente éducation') AND est_en_cours = TRUE ORDER BY salaire_montant DESC LIMIT 10"
+
+  # ─────────────────────────────────────────────
+  # MULTI CRITERES
+  # ─────────────────────────────────────────────
+
+  - id: Q001
+    question: "Extraction de tous les dossiers d'invalidité en cours où il n'y a pas d'information remplie dans les champs attestation de non-activité et justificatif SS."
+    categorie: multi_criteres
+    difficulte: hard
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers]
+    note: "risque=Invalidité ET attest_non_activite_date IS NULL ET justif_ss_date IS NULL"
+    reference_sql: "SELECT * FROM fct__dossiers WHERE risque = 'Invalidité' AND est_en_cours = TRUE AND attest_non_activite_date IS NULL AND justif_ss_date IS NULL"
+
+  - id: Q002
+    question: "Extraction des non cadres qui ont reçu des prestations au titre de la garantie incapacité en 2025."
+    categorie: multi_criteres
+    difficulte: hard
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers, fct__paiements, dim__contrats]
+    note: "Jointure dossiers/paiements — filtre contrat_type=NON CADRE + risque=Incapacité + paiement en 2025"
+    reference_sql: "SELECT DISTINCT d.* FROM fct__dossiers AS d JOIN fct__paiements AS p USING(dossier_id) WHERE d.contrat_type = 'NON CADRE' AND d.risque = 'Incapacité' AND YEAR(p.paiement_date) = 2025"
+
+  - id: Q004
+    question: "Extraction des invalidités en cours où on n'a pas reçu l'attestation de non-activité ou le justificatif SS ou les deux."
+    categorie: multi_criteres
+    difficulte: hard
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers]
+    note: "Variante de Q001 avec OR — distinction subtile à tester"
+    reference_sql: "SELECT * FROM fct__dossiers WHERE risque = 'Invalidité' AND est_en_cours = TRUE AND (attest_non_activite_date IS NULL OR justif_ss_date IS NULL)"
+
+  - id: Q010
+    question: "Nombre de bénéficiaires habitant à l'étranger indemnisés par mois en 2025."
+    categorie: multi_criteres
+    difficulte: hard
+    scope: sql
+    compare: exact_sorted
+    key_column: mois
+    tables: [dim__assures, fct__dossiers]
+    note: "Agrégation temporelle + filtre géographique — double axe d'analyse"
+    reference_sql: "SELECT MONTH(p.paiement_date) AS mois, COUNT(DISTINCT d.assure_id) AS nb_beneficiaires FROM fct__paiements AS p JOIN fct__dossiers AS d USING(dossier_id) JOIN dim__assures AS a ON a.assure_id = d.assure_id WHERE a.pays_code != 'FR' AND YEAR(p.paiement_date) = 2025 GROUP BY MONTH(p.paiement_date) ORDER BY mois"
+
+  - id: Q011
+    question: "Cartographie en termes de pays des assurés résidant à l'étranger qui ont un dossier en cours."
+    categorie: multi_criteres
+    difficulte: medium
+    scope: sql
+    compare: exact_sorted
+    key_column: pays_code
+    tables: [dim__assures]
+    note: "GROUP BY pays_code WHERE pays_code != FR"
+    reference_sql: "SELECT a.pays_code, COUNT(DISTINCT d.assure_id) AS nb_assures FROM fct__dossiers AS d JOIN dim__assures AS a USING(assure_id) WHERE a.pays_code != 'FR' AND d.est_en_cours = TRUE GROUP BY a.pays_code ORDER BY nb_assures DESC"
+
+  - id: Q035
+    question: "Quelle est la part des paiements avec un montant PAS (Prélèvement À la Source) supérieur à 10€ en nombre et en pourcentage ?"
+    categorie: multi_criteres
+    difficulte: medium
+    scope: sql
+    compare: exact_sorted
+    key_column: nb_total
+    tables: [fct__paiements]
+    note: "Ratio paiements avec pas_montant > 10 sur total — syntaxe FILTER WHERE de DuckDB. 1 seule ligne retournée, exact_sorted sur nb_total"
+    reference_sql: "SELECT COUNT(*) AS nb_total, COUNT(*) FILTER (WHERE pas_montant > 10) AS nb_avec_pas, ROUND(COUNT(*) FILTER (WHERE pas_montant > 10) * 100.0 / COUNT(*), 2) AS pct_avec_pas FROM fct__paiements"
+
+  - id: Q041
+    question: "Extraction des dossiers d'incapacité en cours ayant une date d'état de dossier antérieure ou égale au 31/08/2025."
+    categorie: multi_criteres
+    difficulte: medium
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers]
+    note: "Filtre risque=Incapacité + est_en_cours=true + etat_date <= '2025-08-31'"
+    reference_sql: "SELECT * FROM fct__dossiers WHERE risque = 'Incapacité' AND est_en_cours = TRUE AND etat_date <= '2025-08-31'"
+
+  - id: Q042
+    question: "Extraction des dossiers qui ont d'autres ressources que PE ou salaire."
+    categorie: multi_criteres
+    difficulte: medium
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers, fct__ressources]
+    note: "ressource_type NOT IN (PE, Salaire)"
+    reference_sql: "SELECT DISTINCT d.* FROM fct__dossiers AS d JOIN fct__ressources AS r USING(dossier_id) WHERE r.ressource_type NOT IN ('PE', 'Salaire')"
+
+  - id: Q043
+    question: "Extraction des dossiers qui ont plusieurs ressources."
+    categorie: multi_criteres
+    difficulte: medium
+    scope: sql
+    compare: row_count
+    tables: [fct__dossiers, fct__ressources]
+    note: "COUNT(ressource_id) > 1 par dossier"
+    reference_sql: "WITH dossiers_multi_ressources AS (SELECT dossier_id FROM fct__ressources GROUP BY dossier_id HAVING COUNT(*) > 1) SELECT d.* FROM fct__dossiers AS d JOIN dossiers_multi_ressources USING(dossier_id)"
+
+  # ─────────────────────────────────────────────
+  # DOSSIER INDIVIDUEL
+  # ─────────────────────────────────────────────
+
+  - id: Q050
+    question: "Historique des paiements du dossier DOS336060."
+    categorie: dossier_individuel
+    difficulte: easy
+    scope: sql
+    compare: row_count
+    tables: [fct__paiements]
+    note: "Jointure paiements/dossiers — filtre dossier_numero pour récupérer l'historique complet"
+    reference_sql: "SELECT p.* FROM fct__paiements AS p JOIN fct__dossiers AS d USING(dossier_id) WHERE d.dossier_numero = 'DOS336060'"
+
+  - id: Q051
+    question: "Quel est le montant fiscal 2025 à déclarer pour le dossier DOS497225 ?"
+    categorie: dossier_individuel
+    difficulte: easy
+    scope: sql
+    compare: scalar
+    tables: [fct__paiements]
+    note: "SUM(pas_montant) pour l'année 2025 sur un dossier — 1 ligne, valeur exacte"
+    reference_sql: "SELECT SUM(p.pas_montant) FROM fct__paiements AS p JOIN fct__dossiers AS d USING(dossier_id) WHERE d.dossier_numero = 'DOS497225' AND YEAR(p.paiement_date) = 2025"
+
+  - id: Q052
+    question: "Montant à déclarer à la DGFIP pour les années 2023, 2024 et 2025 pour le dossier DOS576180."
+    categorie: dossier_individuel
+    difficulte: medium
+    scope: sql
+    compare: exact_sorted
+    key_column: annee
+    tables: [fct__paiements]
+    note: "SUM(pas_montant) GROUP BY année sur 3 ans"
+    reference_sql: "SELECT YEAR(p.paiement_date) AS annee, SUM(p.pas_montant) FROM fct__paiements AS p JOIN fct__dossiers AS d USING(dossier_id) WHERE d.dossier_numero = 'DOS576180' AND YEAR(p.paiement_date) IN (2023, 2024, 2025) GROUP BY annee ORDER BY annee"
+
+  - id: Q053
+    question: "Quel est le montant versé sur le dossier DOS541134 chaque année depuis le début ?"
+    categorie: dossier_individuel
+    difficulte: medium
+    scope: sql
+    compare: exact_sorted
+    key_column: annee
+    tables: [fct__paiements]
+    note: "SUM(net_montant) GROUP BY YEAR(paiement_date)"
+    reference_sql: "SELECT YEAR(p.paiement_date) AS annee, SUM(p.net_montant) AS montant_verse FROM fct__paiements AS p JOIN fct__dossiers AS d USING(dossier_id) WHERE d.dossier_numero = 'DOS541134' GROUP BY annee ORDER BY annee"
+
+  - id: Q055
+    question: "Extraction des paiements effectués en 2024 pour le contrat C42742."
+    categorie: dossier_individuel
+    difficulte: easy
+    scope: sql
+    compare: row_count
+    tables: [fct__paiements, fct__dossiers]
+    note: "Jointure paiements/contrats — filtre contrat_numero + YEAR(paiement_date) = 2024"
+    reference_sql: "SELECT p.* FROM fct__paiements AS p JOIN dim__contrats AS c USING(contrat_id) WHERE c.contrat_numero = 'C42742' AND YEAR(p.paiement_date) = 2024"
+
+  - id: Q056
+    question: "Récapitulatif des paiements réalisés pour l'ensemble des collaborateurs du contrat C47930 sur 2024."
+    categorie: dossier_individuel
+    difficulte: medium
+    scope: sql
+    compare: exact_sorted
+    key_column: dossier_numero
+    tables: [fct__paiements, fct__dossiers, dim__assures]
+    note: "Triple jointure paiements/contrats/dossiers — SUM(net_montant) GROUP BY dossier + assuré, filtre contrat_numero + 2024"
+    reference_sql: "SELECT d.dossier_numero, p.assure_nom, p.assure_prenom, SUM(p.net_montant), COUNT(*) FROM fct__paiements AS p JOIN dim__contrats AS c USING(contrat_id) JOIN fct__dossiers AS d USING(dossier_id) WHERE c.contrat_numero = 'C47930' AND YEAR(p.paiement_date) = 2024 GROUP BY d.dossier_numero, p.assure_nom, p.assure_prenom ORDER BY p.assure_nom, p.assure_prenom"
+
+  # ─────────────────────────────────────────────
+  # RAG — Questions documentaires
+  # ─────────────────────────────────────────────
+
+  - id: Q026
+    question: "Avez-vous une désignation de bénéficiaire en anglais pour le contrat [NUM_CONTRAT] ?"
+    categorie: rag
+    difficulte: medium
+    scope: rag
+    compare: skip
+    note: "Recherche dans les documents contractuels du contrat"
+
+  - id: Q027
+    question: "Est-ce que toutes les adresses des formulaires ont été mises à jour ?"
+    categorie: rag
+    difficulte: hard
+    scope: rag
+    compare: skip
+    note: "Comparaison entre plusieurs documents — question de vérification"
+
+  - id: Q028
+    question: "Quelle est la définition des bénéficiaires type du contrat [NUM_CONTRAT] ?"
+    categorie: rag
+    difficulte: medium
+    scope: rag
+    compare: skip
+    note: "Extraction d'une clause contractuelle spécifique"
+
+  - id: Q029
+    question: "Quelle est la clause type du contrat [NOM_CONTRAT] ?"
+    categorie: rag
+    difficulte: easy
+    scope: rag
+    compare: skip
+    note: "Extraction d'une clause générique dans les documents d'un contrat nommé"
+
+  - id: Q030
+    question: "Quels contrats couvrent les concubins ?"
+    categorie: rag
+    difficulte: hard
+    scope: rag
+    compare: skip
+    note: "Recherche transversale sur l'ensemble du corpus documentaire"
+
+  - id: Q031
+    question: "Quels contrats n'ont pas les mêmes couvertures de garantie entre la notice d'information et le détail du contrat ?"
+    categorie: rag
+    difficulte: hard
+    scope: rag
+    compare: skip
+    note: "Comparaison de deux documents par contrat — cas hybride complexe"
+
+  - id: Q048
+    question: "Avez-vous une copie du contrat [NUM_CONTRAT] ?"
+    categorie: rag
+    difficulte: easy
+    scope: rag
+    compare: skip
+    note: "Recherche de document par identifiant"
+
+  # ─────────────────────────────────────────────
+  # HORS SCOPE
+  # ─────────────────────────────────────────────
+
+  - id: Q013
+    question: "Compléter cette liste avec l'info salaire de référence. [LISTE_EXTERNE]"
+    categorie: hors_scope
+    difficulte: hard
+    scope: hors_scope
+    compare: skip
+    note: "Enrichissement d'une liste externe apportée par l'utilisateur — non supporté en v1"
