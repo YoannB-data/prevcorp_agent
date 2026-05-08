@@ -566,7 +566,7 @@ questions:
     key_column: annee
     tables: [fct__paiements]
     note: "SUM(pas_montant) GROUP BY année sur 3 ans"
-    reference_sql: "SELECT YEAR(p.paiement_date) AS annee, SUM(p.pas_montant) FROM fct__paiements AS p JOIN fct__dossiers AS d USING(dossier_id) WHERE d.dossier_numero = 'DOS576180' AND YEAR(p.paiement_date) IN (2023, 2024, 2025) GROUP BY annee ORDER BY annee"
+    reference_sql: "SELECT YEAR(p.paiement_date) AS annee, SUM(p.pas_montant) AS montant_pas FROM fct__paiements AS p JOIN fct__dossiers AS d USING(dossier_id) WHERE d.dossier_numero = 'DOS576180' AND YEAR(p.paiement_date) IN (2023, 2024, 2025) GROUP BY annee ORDER BY annee"
 
   - id: Q053
     question: "Quel est le montant versé sur le dossier DOS541134 chaque année depuis le début ?"
