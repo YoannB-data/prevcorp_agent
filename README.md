@@ -44,8 +44,13 @@ DUCKDB_PATH=/chemin/vers/base.duckdb
 
 ## Utilisation
 
-```bash
-uv run python -m src
+> Point d'entrée CLI non encore implémenté (`src/__main__.py` manquant). Appeler `agent_main()` directement depuis un script ou un notebook.
+
+```python
+from src.agent import agent_main
+
+df = agent_main("Combien de dossiers ouverts en 2024 ?")
+print(df)
 ```
 
 ## Structure
@@ -56,10 +61,12 @@ src/
   config.py          # Paramètres (clés, chemins, modèle)
   schema_loader.py   # Lecture du manifest dbt → contexte schéma
   duckdb_executor.py # Exécution SQL en lecture seule
+  logger.py          # Logger d'interactions vers DuckDB (tokens, latence)
   prompts/
     system_prompt.md # Prompt système injecté dans chaque conversation
 evals/
   eval_set.yaml      # 63 questions d'évaluation (catégories, niveaux)
+  run_evals.py       # Runner d'évaluations
 ```
 
 ## Schéma de données
@@ -76,7 +83,7 @@ Base en étoile :
 63 questions de test couvrant : `agregation`, `liste`, `filtrage_temporel`, `filtrage_entite`, `top_n`, `multi_criteres`, `dossier_individuel`, `rag`, `hors_scope`.
 
 ```bash
-uv run pytest
+uv run python evals/run_evals.py
 ```
 
 ## Stack technique
