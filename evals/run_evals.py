@@ -104,7 +104,7 @@ def run_single_eval(item: dict) -> dict:
         return {"id": qid, "question": question, "status": "SKIP", "detail": ""}
 
     try:
-        df_agent = agent_main(question)
+        df_agent = agent_main(question, eval_question_id=qid)
         df_ref = execute_query(reference_sql)
         passed, detail = _compare(compare, key_column, df_agent, df_ref)
         return {
