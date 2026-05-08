@@ -69,7 +69,7 @@ Base en étoile :
 | Type | Tables |
 |------|--------|
 | Dimensions | `dim__assures`, `dim__contrats`, `dim__entreprises`, `dim__beneficiaires` |
-| Faits | `fct__dossiers`, `fct__paiements`, `fct__cotisations`, `fct__ressources` |
+| Faits | `fct__dossiers`, `fct__paiements`, `fct__cotisations`, `fct__ressources`, `fct__contrats_entreprises` |
 
 ## Évaluations
 

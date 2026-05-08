@@ -3,4 +3,5 @@
 __pycache__/
 .env
 CLAUDE.md
-sandbox.py
+sandbox.*
+evals/reports/
