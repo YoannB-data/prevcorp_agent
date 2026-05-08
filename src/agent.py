@@ -1,5 +1,6 @@
 """Orchestration du pipeline question → SQL → résultat via l'API Claude"""
 import re
+import time
 from pathlib import Path
 
 import anthropic
@@ -8,6 +9,7 @@ import pandas as pd
 from src import config
 from src.duckdb_executor import execute_query
 from src.schema_loader import load_schema
+from src.logger import log_interaction
 
 
 def _format_schema(schema: dict) -> str:
@@ -23,18 +25,20 @@ def _format_schema(schema: dict) -> str:
     return "\n".join(lines)
 
 
-def _call_llm(system_prompt, message) -> str:
-    """Envoie un message à l'API Anthropic et retourne le texte de la réponse"""
+def _call_llm(system_prompt, message) -> tuple[str, int, int]:
+    """Envoie un message à l'API Anthropic et retourne le texte + tokens consommés"""
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-
     response = client.messages.create(
         model=config.MODEL,
         max_tokens=config.MAX_TOKENS,
         system=system_prompt,
         messages=[{"role": "user", "content": message}],
     )
-
-    return response.content[0].text
+    return (
+        response.content[0].text,
+        response.usage.input_tokens,
+        response.usage.output_tokens,
+    )
 
 
 def _extract_sql(text) -> str:
@@ -46,7 +50,7 @@ def _extract_sql(text) -> str:
     return match.group(1).strip()
 
 
-def agent_main(question: str) -> pd.DataFrame:
+def agent_main(question: str, eval_question_id: str | None = None) -> pd.DataFrame:
     """Traduit une question métier en DataFrame via génération et exécution de SQL"""
     schema = load_schema()
     schema_str = _format_schema(schema)
@@ -61,10 +65,35 @@ def agent_main(question: str) -> pd.DataFrame:
         {schema_str}
         """
 
-    text = _call_llm(system_prompt, message_to_llm)
+    start = time.perf_counter()
+    sql_generated = None
+    input_tokens = 0
+    output_tokens = 0
 
-    sql_bloc = _extract_sql(text)
+    try:
+        text, input_tokens, output_tokens = _call_llm(system_prompt, message_to_llm)
+        sql_generated = _extract_sql(text)
+        df = execute_query(sql_generated)
+        log_interaction(
+            question=question,
+            sql_generated=sql_generated,
+            status="success",
+            latency_ms=int((time.perf_counter() - start) * 1000),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            eval_question_id=eval_question_id,
+        )
+        return df
 
-    df = execute_query(sql_bloc)
-
-    return df
+    except Exception as exc:
+        log_interaction(
+            question=question,
+            sql_generated=sql_generated,
+            status="error",
+            latency_ms=int((time.perf_counter() - start) * 1000),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            error_message=str(exc),
+            eval_question_id=eval_question_id,
+        )
+        raise
