@@ -7,6 +7,8 @@ from src.config import DUCKDB_PATH
 
 def execute_query(sql: str) -> pd.DataFrame:
     """Exécute une requête SQL en lecture seule et retourne le résultat en DataFrame"""
+    if not sql or not sql.strip():
+        raise ValueError("La requête SQL est vide")
     if not DUCKDB_PATH.exists():
         raise FileNotFoundError(f"DuckDB introuvable : {DUCKDB_PATH}")
     try:
