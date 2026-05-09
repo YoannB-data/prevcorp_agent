@@ -1,7 +1,9 @@
-.venv/
 .claude
+.pytest_cache/
+.venv/
 __pycache__/
+evals/reports/
+logs/
 .env
 CLAUDE.md
 sandbox.*
-evals/reports/
