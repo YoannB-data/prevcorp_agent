@@ -185,9 +185,12 @@ def run_evals(ids: list[str] | None = None) -> list[dict]:
         questions = yaml.safe_load(f)["questions"]
     if ids:
         questions = [q for q in questions if q["id"] in ids]
-    results = [run_single_eval(item) for item in questions]
-    for r in results:
-        print(f"[{r['status']}] {r['id']} : {r['question'][:70]}")
+    results = []
+    total = len(questions)
+    for i, item in enumerate(questions, 1):
+        r = run_single_eval(item)
+        results.append(r)
+        print(f"[{i}/{total}] [{r['status']}] {r['id']} : {r['question'][:70]}")
         if r["detail"]:
             print(f"       {r['detail'][:200]}")
 
