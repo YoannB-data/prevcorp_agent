@@ -14,10 +14,18 @@ def load_schema() -> dict:
         data = json.load(f)
         schema = {}
 
-        # Itérer sur un dictionnaire
+        # Guard : Manifest vide : probablement un dbt compile qui n'a pas tourné
+        if not data["nodes"]:
+            raise ValueError("manifest.json ne contient aucun node")
+
         for _, value in data["nodes"].items():
+            # On ne garde que les modèles du layer marts (pas sources, tests, snapshots…)
             if ("marts" in value["path"]) and (value["resource_type"] == "model"):
                 table_name = value["name"]  # ex: "dim__assures"
+
+                # Guard : Colonnes vides : modèle déclaré mais pas encore documenté dans dbt
+                if not value["columns"]:
+                    raise ValueError(f"Le modèle '{table_name}' ne contient aucune colonne")
 
                 # Construire le dict des colonnes
                 columns = {}
@@ -29,4 +37,9 @@ def load_schema() -> dict:
                     "description": value["description"],
                     "columns": columns,
                 }
+
+        # Guard : Aucun modèle marts trouvé : manifest issu d'un autre layer (staging, seeds…)
+        if not schema:
+            raise ValueError("manifest.json ne contient aucun modèle dans le layer marts")
+
     return schema
