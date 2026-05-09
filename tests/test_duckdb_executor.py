@@ -1,5 +1,8 @@
 """Tests unitaires pour execute_query() — chaque test contrôle DUCKDB_PATH via monkeypatch
 pour ne jamais toucher la base réelle du projet."""
+
+from pathlib import Path
+
 import duckdb
 import pandas as pd
 import pytest
@@ -16,9 +19,9 @@ def _create_db(path):
 
 def test_base_absente(monkeypatch):
     """DUCKDB_PATH pointe vers un fichier inexistant : FileNotFoundError."""
-    from pathlib import Path
-
-    monkeypatch.setattr("src.duckdb_executor.DUCKDB_PATH", Path("/inexistant/db.duckdb"))
+    monkeypatch.setattr(
+        "src.duckdb_executor.DUCKDB_PATH", Path("/inexistant/db.duckdb")
+    )
     with pytest.raises(FileNotFoundError):
         execute_query("SELECT 1")
 

@@ -1,8 +1,9 @@
 """Logging des interactions agent vers DuckDB."""
 
-import duckdb
 from datetime import datetime, timezone
 from pathlib import Path
+
+import duckdb
 
 LOGS_DB_PATH = Path("logs/logs.duckdb")
 
@@ -25,7 +26,7 @@ INSERT INTO interactions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
-def log_interaction(
+def log_interaction(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     question: str,
     sql_generated: str | None,
     status: str,

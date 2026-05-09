@@ -13,12 +13,8 @@ from src.duckdb_executor import execute_query
 EVAL_FILE = Path(__file__).parent / "eval_set.yml"
 
 
-# ─────────────────────────────────────────────
-# Fonctions de comparaison
-# ─────────────────────────────────────────────
-
-
 def _compare_scalar(df_a: pd.DataFrame, df_r: pd.DataFrame) -> tuple[bool, str]:
+    """Compare une valeur scalaire unique, avec tolérance flottante si possible."""
     val_a = df_a.iloc[0, 0]
     val_r = df_r.iloc[0, 0]
     try:
@@ -31,6 +27,7 @@ def _compare_scalar(df_a: pd.DataFrame, df_r: pd.DataFrame) -> tuple[bool, str]:
 
 
 def _compare_row_count(df_a: pd.DataFrame, df_r: pd.DataFrame) -> tuple[bool, str]:
+    """Compare uniquement le nombre de lignes, sans regarder les valeurs."""
     if len(df_a) == len(df_r):
         return True, ""
     return False, f"agent={len(df_a)} lignes, ref={len(df_r)} lignes"
@@ -39,6 +36,7 @@ def _compare_row_count(df_a: pd.DataFrame, df_r: pd.DataFrame) -> tuple[bool, st
 def _compare_key_set(
     df_a: pd.DataFrame, df_r: pd.DataFrame, key_column: str
 ) -> tuple[bool, str]:
+    """Compare les ensembles de clés sans tenir compte de l'ordre ni des doublons."""
     set_a = set(df_a[key_column])
     set_r = set(df_r[key_column])
     if set_a == set_r:
@@ -49,23 +47,18 @@ def _compare_key_set(
 
 
 def _compare_exact_sorted(
-    df_a: pd.DataFrame, df_r: pd.DataFrame, key_column: str
+    df_a: pd.DataFrame, df_r: pd.DataFrame, _key_column: str
 ) -> tuple[bool, str]:
+    """Compare valeurs et ordre exact, rapporte les lignes divergentes."""
     if df_a.shape != df_r.shape:
         return False, f"shape: agent={df_a.shape}, ref={df_r.shape}"
     if df_a.values.tolist() == df_r.values.tolist():
         return True, ""
-    # Afficher les différences ligne par ligne
     diffs = []
     for i, (row_a, row_r) in enumerate(zip(df_a.values.tolist(), df_r.values.tolist())):
         if row_a != row_r:
             diffs.append(f"ligne {i}: agent={row_a}, ref={row_r}")
     return False, " | ".join(diffs)
-
-
-# ─────────────────────────────────────────────
-# Dispatcher
-# ─────────────────────────────────────────────
 
 
 def _compare(
@@ -74,6 +67,7 @@ def _compare(
     df_agent: pd.DataFrame,
     df_ref: pd.DataFrame,
 ) -> tuple[bool, str]:
+    """Dispatche vers la fonction de comparaison adaptée au mode demandé."""
     match compare:
         case "scalar":
             return _compare_scalar(df_agent, df_ref)
@@ -85,11 +79,6 @@ def _compare(
             return _compare_exact_sorted(df_agent, df_ref, key_column)
         case _:
             return False, f"mode de comparaison inconnu : {compare}"
-
-
-# ─────────────────────────────────────────────
-# Évaluation d'une question
-# ─────────────────────────────────────────────
 
 
 def run_single_eval(item: dict) -> dict:
@@ -142,7 +131,9 @@ def write_report(results: list[dict]) -> None:
         "|--------|--------|",
     ]
     for status in ("PASS", "FAIL", "ERROR", "SKIP"):
-        lines.append(f"| {status} | {sum(1 for r in results if r['status'] == status)} |")
+        lines.append(
+            f"| {status} | {sum(1 for r in results if r['status'] == status)} |"
+        )
 
     lines += [
         "",
@@ -208,6 +199,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Runner d'évaluation PrevCorp Agent")
-    parser.add_argument("--ids", nargs="*", metavar="ID", help="IDs à évaluer (ex: Q012 Q034)")
+    parser.add_argument(
+        "--ids", nargs="*", metavar="ID", help="IDs à évaluer (ex: Q012 Q034)"
+    )
     args = parser.parse_args()
     run_evals(ids=args.ids)

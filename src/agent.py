@@ -1,4 +1,5 @@
 """Orchestration du pipeline question → SQL → résultat via l'API Claude"""
+
 import re
 import time
 from pathlib import Path
@@ -8,8 +9,8 @@ import pandas as pd
 
 from src import config
 from src.duckdb_executor import execute_query
-from src.schema_loader import load_schema
 from src.logger import log_interaction
+from src.schema_loader import load_schema
 
 
 def _format_schema(schema: dict) -> str:
@@ -55,7 +56,9 @@ def agent_main(question: str, eval_question_id: str | None = None) -> pd.DataFra
     schema = load_schema()
     schema_str = _format_schema(schema)
 
-    with open(Path(__file__).parent / "prompts" / "system_prompt.md", encoding="utf-8") as f:
+    with open(
+        Path(__file__).parent / "prompts" / "system_prompt.md", encoding="utf-8"
+    ) as f:
         system_prompt = f.read()
 
     message_to_llm = f"""
@@ -66,6 +69,7 @@ def agent_main(question: str, eval_question_id: str | None = None) -> pd.DataFra
         """
 
     start = time.perf_counter()
+    # Initialisés ici pour rester accessibles dans le except si _call_llm échoue avant de les setter
     sql_generated = None
     input_tokens = 0
     output_tokens = 0
@@ -86,6 +90,7 @@ def agent_main(question: str, eval_question_id: str | None = None) -> pd.DataFra
         return df
 
     except Exception as exc:
+        # Catch-all - loggue avant de re-lever pour persister l'erreur quelle que soit son origine
         log_interaction(
             question=question,
             sql_generated=sql_generated,

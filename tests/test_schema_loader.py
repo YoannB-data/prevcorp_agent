@@ -1,6 +1,8 @@
 """Chaque fixture représente un état possible du fichier manifest.json produit par `dbt compile`.
 On n'utilise que les champs réellement lus par load_schema() pour rester lisible."""
+
 import json
+from pathlib import Path
 
 import pytest
 
@@ -35,7 +37,6 @@ MANIFEST_EMPTY_COLUMNS = {
     }
 }
 
-# Manifest complet et valide : un modèle marts avec deux colonnes documentées
 MANIFEST_VALID = {
     "nodes": {
         "model.project.dim__assures": {
@@ -52,13 +53,11 @@ MANIFEST_VALID = {
 }
 
 
-# Tests
-
 def test_manifest_absent(monkeypatch):
     """MANIFEST_PATH pointe vers un fichier inexistant : FileNotFoundError."""
-    from pathlib import Path
-
-    monkeypatch.setattr("src.schema_loader.MANIFEST_PATH", Path("/inexistant/manifest.json"))
+    monkeypatch.setattr(
+        "src.schema_loader.MANIFEST_PATH", Path("/inexistant/manifest.json")
+    )
     with pytest.raises(FileNotFoundError):
         load_schema()
 
@@ -74,7 +73,7 @@ def test_manifest_sans_nodes(tmp_path, monkeypatch):
 
 
 def test_manifest_sans_marts(tmp_path, monkeypatch):
-    """Nodes présents mais tous hors layer marts (ex. staging) : ValueError signalant l'absence de marts."""
+    """Nodes présents mais hors layer marts (ex. staging) : ValueError sur absence de marts."""
     manifest_file = tmp_path / "manifest.json"
     manifest_file.write_text(json.dumps(MANIFEST_NO_MARTS), encoding="utf-8")
     monkeypatch.setattr("src.schema_loader.MANIFEST_PATH", manifest_file)
