@@ -37,9 +37,9 @@ def log_interaction(  # pylint: disable=too-many-arguments,too-many-positional-a
     eval_question_id: str | None = None,
 ) -> None:
     """Insère une ligne dans la table interactions."""
+
     LOGS_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    con = duckdb.connect(str(LOGS_DB_PATH))
-    try:
+    with duckdb.connect(str(LOGS_DB_PATH)) as con:
         con.execute(_CREATE_TABLE)
         con.execute(
             _INSERT,
@@ -55,5 +55,3 @@ def log_interaction(  # pylint: disable=too-many-arguments,too-many-positional-a
                 eval_question_id,
             ],
         )
-    finally:
-        con.close()
