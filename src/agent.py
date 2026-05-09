@@ -15,6 +15,7 @@ from src.schema_loader import load_schema
 
 def _format_schema(schema: dict) -> str:
     """Formate le schéma en texte lisible pour injection dans le prompt"""
+
     lines = []
     for table_name, table_info in schema.items():
         lines.append(f"Table : {table_name}")
@@ -28,6 +29,7 @@ def _format_schema(schema: dict) -> str:
 
 def _call_llm(system_prompt, message) -> tuple[str, int, int]:
     """Envoie un message à l'API Anthropic et retourne le texte + tokens consommés"""
+
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
     response = client.messages.create(
         model=config.MODEL,
@@ -44,6 +46,7 @@ def _call_llm(system_prompt, message) -> tuple[str, int, int]:
 
 def _extract_sql(text) -> str:
     """Extrait le bloc SQL d'une réponse Markdown de l'API"""
+
     match = re.search(r"```sql\n(.*?)```", text, re.DOTALL)
     if not match:
         raise ValueError(f"Pas de SQL trouvé dans la réponse : {text}")
@@ -53,6 +56,7 @@ def _extract_sql(text) -> str:
 
 def agent_main(question: str, eval_question_id: str | None = None) -> pd.DataFrame:
     """Traduit une question métier en DataFrame via génération et exécution de SQL"""
+
     schema = load_schema()
     schema_str = _format_schema(schema)
 

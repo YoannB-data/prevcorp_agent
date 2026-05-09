@@ -8,6 +8,7 @@ from src.config import DUCKDB_PATH
 
 def execute_query(sql: str) -> pd.DataFrame:
     """Exécute une requête SQL en lecture seule et retourne le résultat en DataFrame"""
+
     # Guard - con.sql("") retourne None au lieu de lever une erreur DuckDB
     if not sql or not sql.strip():
         raise ValueError("La requête SQL est vide")

@@ -55,6 +55,7 @@ MANIFEST_VALID = {
 
 def test_manifest_absent(monkeypatch):
     """MANIFEST_PATH pointe vers un fichier inexistant : FileNotFoundError."""
+
     monkeypatch.setattr(
         "src.schema_loader.MANIFEST_PATH", Path("/inexistant/manifest.json")
     )
@@ -64,6 +65,7 @@ def test_manifest_absent(monkeypatch):
 
 def test_manifest_sans_nodes(tmp_path, monkeypatch):
     """Manifest valide JSON mais nodes vide : ValueError signalant l'absence de nodes."""
+
     manifest_file = tmp_path / "manifest.json"
     manifest_file.write_text(json.dumps(MANIFEST_NO_NODES), encoding="utf-8")
     monkeypatch.setattr("src.schema_loader.MANIFEST_PATH", manifest_file)
@@ -74,6 +76,7 @@ def test_manifest_sans_nodes(tmp_path, monkeypatch):
 
 def test_manifest_sans_marts(tmp_path, monkeypatch):
     """Nodes présents mais hors layer marts (ex. staging) : ValueError sur absence de marts."""
+
     manifest_file = tmp_path / "manifest.json"
     manifest_file.write_text(json.dumps(MANIFEST_NO_MARTS), encoding="utf-8")
     monkeypatch.setattr("src.schema_loader.MANIFEST_PATH", manifest_file)
@@ -83,6 +86,7 @@ def test_manifest_sans_marts(tmp_path, monkeypatch):
 
 def test_marts_sans_colonnes(tmp_path, monkeypatch):
     """Modèle marts déclaré dans dbt mais pas encore documenté (columns: {}) : ValueError."""
+
     manifest_file = tmp_path / "manifest.json"
     manifest_file.write_text(json.dumps(MANIFEST_EMPTY_COLUMNS), encoding="utf-8")
     monkeypatch.setattr("src.schema_loader.MANIFEST_PATH", manifest_file)
@@ -92,6 +96,7 @@ def test_marts_sans_colonnes(tmp_path, monkeypatch):
 
 def test_cas_valide(tmp_path, monkeypatch):
     """Manifest complet : retourne un dict avec les tables marts et leurs colonnes."""
+
     manifest_file = tmp_path / "manifest.json"
     manifest_file.write_text(json.dumps(MANIFEST_VALID), encoding="utf-8")
     monkeypatch.setattr("src.schema_loader.MANIFEST_PATH", manifest_file)

@@ -15,6 +15,7 @@ EVAL_FILE = Path(__file__).parent / "eval_set.yml"
 
 def _compare_scalar(df_a: pd.DataFrame, df_r: pd.DataFrame) -> tuple[bool, str]:
     """Compare une valeur scalaire unique, avec tolérance flottante si possible."""
+
     val_a = df_a.iloc[0, 0]
     val_r = df_r.iloc[0, 0]
     try:
@@ -28,6 +29,7 @@ def _compare_scalar(df_a: pd.DataFrame, df_r: pd.DataFrame) -> tuple[bool, str]:
 
 def _compare_row_count(df_a: pd.DataFrame, df_r: pd.DataFrame) -> tuple[bool, str]:
     """Compare uniquement le nombre de lignes, sans regarder les valeurs."""
+
     if len(df_a) == len(df_r):
         return True, ""
     return False, f"agent={len(df_a)} lignes, ref={len(df_r)} lignes"
@@ -37,6 +39,7 @@ def _compare_key_set(
     df_a: pd.DataFrame, df_r: pd.DataFrame, key_column: str
 ) -> tuple[bool, str]:
     """Compare les ensembles de clés sans tenir compte de l'ordre ni des doublons."""
+
     set_a = set(df_a[key_column])
     set_r = set(df_r[key_column])
     if set_a == set_r:
@@ -50,6 +53,7 @@ def _compare_exact_sorted(
     df_a: pd.DataFrame, df_r: pd.DataFrame, _key_column: str
 ) -> tuple[bool, str]:
     """Compare valeurs et ordre exact, rapporte les lignes divergentes."""
+
     if df_a.shape != df_r.shape:
         return False, f"shape: agent={df_a.shape}, ref={df_r.shape}"
     if df_a.values.tolist() == df_r.values.tolist():
@@ -68,6 +72,7 @@ def _compare(
     df_ref: pd.DataFrame,
 ) -> tuple[bool, str]:
     """Dispatche vers la fonction de comparaison adaptée au mode demandé."""
+
     match compare:
         case "scalar":
             return _compare_scalar(df_agent, df_ref)
@@ -83,6 +88,7 @@ def _compare(
 
 def run_single_eval(item: dict) -> dict:
     """Évalue une question et retourne un dict avec id, question, status et detail."""
+
     qid = item["id"]
     question = item["question"]
     compare = item.get("compare", "skip")
@@ -113,6 +119,7 @@ def run_single_eval(item: dict) -> dict:
 
 def write_report(results: list[dict]) -> None:
     """Écrit le rapport d'évaluation dans evals/reports/report_YYYYMMDD_HHMMSS.md."""
+
     now = datetime.datetime.now()
     reports_dir = Path(__file__).parent / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
@@ -173,6 +180,7 @@ def write_report(results: list[dict]) -> None:
 
 def run_evals(ids: list[str] | None = None) -> list[dict]:
     """Lance toutes les évaluations (ou une partie), affiche la progression et le résumé final."""
+
     with open(EVAL_FILE, encoding="utf-8") as f:
         questions = yaml.safe_load(f)["questions"]
     if ids:
