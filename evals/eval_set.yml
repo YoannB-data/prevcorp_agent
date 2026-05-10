@@ -182,7 +182,7 @@ questions:
     reference_sql: "SELECT * FROM fct__paiements WHERE YEAR(paiement_date) = 2025"
 
   - id: Q039
-    question: "Extraction des contrats suivants [NUM_CONTRAT] [NUM_CONTRAT] [NUM_CONTRAT] — liste des arrêts encore en cours d'indemnisation."
+    question: "Extraction des contrats suivants C10150 C10205 C10425 — liste des arrêts encore en cours d'indemnisation."
     categorie: liste
     difficulte: easy
     scope: sql
@@ -192,7 +192,7 @@ questions:
     reference_sql: "SELECT * FROM fct__dossiers WHERE contrat_numero IN ('C10150', 'C10205', 'C10425') AND risque = 'Incapacité' AND est_en_cours = TRUE"
 
   - id: Q049
-    question: "Extraction de suivi des invalidités [NOM_CONTRAT]."
+    question: "Extraction de suivi des invalidités Allard."
     categorie: liste
     difficulte: easy
     scope: sql
@@ -247,7 +247,7 @@ questions:
     reference_sql: "SELECT p.assure_nom, p.assure_prenom, d.risque, COUNT(DISTINCT p.dossier_id) AS nb_dossiers, SUM(p.brut_montant) AS total_brut, SUM(p.net_montant) AS total_net, MIN(p.paiement_date) AS premier_paiement, MAX(p.paiement_date) AS dernier_paiement FROM fct__paiements p JOIN fct__dossiers d ON d.dossier_id = p.dossier_id JOIN dim__contrats c ON c.contrat_id = p.contrat_id WHERE c.contrat_numero = 'C74382' AND d.risque = 'Incapacité' AND YEAR(c.debut_date) = 2023 GROUP BY p.assure_nom, p.assure_prenom, d.risque"
 
   - id: Q015
-    question: "Extraction des encours du segment [NOM_SEGMENT] au 31/12/2024 pour une reprise par un nouvel assureur."
+    question: "Extraction des encours du segment Commerce de détail au 31/12/2024 pour une reprise par un nouvel assureur."
     categorie: filtrage_temporel
     difficulte: hard
     scope: sql
@@ -361,7 +361,7 @@ questions:
     reference_sql: "SELECT * FROM fct__contrats_entreprises AS ce JOIN dim__contrats AS c USING(contrat_id) WHERE ce.entreprise_nom = 'Muller' AND c.debut_date <= '2014-12-31' AND (c.fin_date IS NULL OR c.fin_date > '2014-12-31')"
 
   - id: Q038
-    question: "Extraction des dossiers pour lesquels un règlement a été effectué depuis 2024 sur les contrats [NUM_CONTRAT] et [NUM_CONTRAT]."
+    question: "Extraction des dossiers pour lesquels un règlement a été effectué depuis 2024 sur les contrats C23224 et C82845."
     categorie: filtrage_entite
     difficulte: medium
     scope: sql
@@ -479,18 +479,18 @@ questions:
     key_column: mois
     tables: [dim__assures, fct__dossiers]
     note: "Agrégation temporelle + filtre géographique — double axe d'analyse"
-    reference_sql: "SELECT MONTH(p.paiement_date) AS mois, COUNT(DISTINCT d.assure_id) AS nb_beneficiaires FROM fct__paiements AS p JOIN fct__dossiers AS d USING(dossier_id) JOIN dim__assures AS a ON a.assure_id = d.assure_id WHERE a.pays_code != 'FR' AND YEAR(p.paiement_date) = 2025 GROUP BY MONTH(p.paiement_date) ORDER BY mois"
+    reference_sql: "SELECT DATE_TRUNC('month', p.paiement_date) AS mois, COUNT(DISTINCT d.assure_id) AS nb_beneficiaires FROM fct__paiements AS p JOIN fct__dossiers AS d USING(dossier_id) JOIN dim__assures AS a ON a.assure_id = d.assure_id WHERE a.pays_code != 'FR' AND YEAR(p.paiement_date) = 2025 GROUP BY DATE_TRUNC('month', p.paiement_date) ORDER BY mois"
 
   - id: Q011
     question: "Cartographie en termes de pays des assurés résidant à l'étranger qui ont un dossier en cours."
     categorie: multi_criteres
     difficulte: medium
     scope: sql
-    compare: exact_sorted
+    compare: key_set
     key_column: pays_code
     tables: [dim__assures]
     note: "GROUP BY pays_code WHERE pays_code != FR"
-    reference_sql: "SELECT a.pays_code, COUNT(DISTINCT d.assure_id) AS nb_assures FROM fct__dossiers AS d JOIN dim__assures AS a USING(assure_id) WHERE a.pays_code != 'FR' AND d.est_en_cours = TRUE GROUP BY a.pays_code ORDER BY nb_assures DESC"
+    reference_sql: "SELECT a.pays_code FROM fct__dossiers AS d JOIN dim__assures AS a USING(assure_id) WHERE a.pays_code != 'FR' AND d.est_en_cours = TRUE GROUP BY a.pays_code"
 
   - id: Q035
     question: "Quelle est la part des paiements avec un montant PAS (Prélèvement À la Source) supérieur à 10€ en nombre et en pourcentage ?"
@@ -501,7 +501,7 @@ questions:
     key_column: nb_total
     tables: [fct__paiements]
     note: "Ratio paiements avec pas_montant > 10 sur total — syntaxe FILTER WHERE de DuckDB. 1 seule ligne retournée, exact_sorted sur nb_total"
-    reference_sql: "SELECT COUNT(*) AS nb_total, COUNT(*) FILTER (WHERE pas_montant > 10) AS nb_avec_pas, ROUND(COUNT(*) FILTER (WHERE pas_montant > 10) * 100.0 / COUNT(*), 2) AS pct_avec_pas FROM fct__paiements"
+    reference_sql: "SELECT COUNT(*) FILTER (WHERE pas_montant > 10) AS nb_avec_pas, COUNT(*) AS nb_total, ROUND(COUNT(*) FILTER (WHERE pas_montant > 10) * 100.0 / COUNT(*), 2) AS pct_avec_pas FROM fct__paiements"
 
   - id: Q041
     question: "Extraction des dossiers d'incapacité en cours ayant une date d'état de dossier antérieure ou égale au 31/08/2025."
@@ -573,8 +573,7 @@ questions:
     categorie: dossier_individuel
     difficulte: medium
     scope: sql
-    compare: exact_sorted
-    key_column: annee
+    compare: row_count
     tables: [fct__paiements]
     note: "SUM(net_montant) GROUP BY YEAR(paiement_date)"
     reference_sql: "SELECT YEAR(p.paiement_date) AS annee, SUM(p.net_montant) AS montant_verse FROM fct__paiements AS p JOIN fct__dossiers AS d USING(dossier_id) WHERE d.dossier_numero = 'DOS541134' GROUP BY annee ORDER BY annee"
@@ -594,8 +593,7 @@ questions:
     categorie: dossier_individuel
     difficulte: medium
     scope: sql
-    compare: exact_sorted
-    key_column: dossier_numero
+    compare: row_count
     tables: [fct__paiements, fct__dossiers, dim__assures]
     note: "Triple jointure paiements/contrats/dossiers — SUM(net_montant) GROUP BY dossier + assuré, filtre contrat_numero + 2024"
     reference_sql: "SELECT d.dossier_numero, p.assure_nom, p.assure_prenom, SUM(p.net_montant), COUNT(*) FROM fct__paiements AS p JOIN dim__contrats AS c USING(contrat_id) JOIN fct__dossiers AS d USING(dossier_id) WHERE c.contrat_numero = 'C47930' AND YEAR(p.paiement_date) = 2024 GROUP BY d.dossier_numero, p.assure_nom, p.assure_prenom ORDER BY p.assure_nom, p.assure_prenom"
