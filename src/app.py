@@ -3,6 +3,7 @@
 import streamlit as st
 
 from src.agent import agent_main
+from src.chart_utils import try_build_chart
 
 st.set_page_config(page_title="PrevCorp Agent", layout="wide")
 
@@ -28,3 +29,6 @@ for entry in st.session_state.history:
     st.markdown(f"**{entry['question']}**")
     st.code(entry["sql"], language="sql")
     st.dataframe(entry["result"], use_container_width=True)
+    fig = try_build_chart(entry["result"])
+    if fig is not None:
+        st.plotly_chart(fig, use_container_width=True)
