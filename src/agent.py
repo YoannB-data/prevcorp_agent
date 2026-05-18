@@ -54,7 +54,7 @@ def _extract_sql(text) -> str:
     return match.group(1).strip()
 
 
-def agent_main(question: str, eval_question_id: str | None = None) -> pd.DataFrame:
+def agent_main(question: str, eval_question_id: str | None = None) -> tuple[str, pd.DataFrame]:
     """Traduit une question métier en DataFrame via génération et exécution de SQL"""
 
     schema = load_schema()
@@ -91,7 +91,7 @@ def agent_main(question: str, eval_question_id: str | None = None) -> pd.DataFra
             output_tokens=output_tokens,
             eval_question_id=eval_question_id,
         )
-        return df
+        return sql_generated, df
 
     except Exception as exc:
         # Catch-all - loggue avant de re-lever pour persister l'erreur quelle que soit son origine
