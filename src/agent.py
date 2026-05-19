@@ -34,8 +34,6 @@ def _call_llm_with_retry(system_prompt, message, max_retries) -> tuple[str, int,
         raise ValueError("max_retries doit être >= 1")
 
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-    # satisfait le type checker : la boucle garantit qu'on l'écrase avant usage
-    last_error: Exception = RuntimeError("unreachable")
     for attempt in range(max_retries):
         try:
             response = client.messages.create(
