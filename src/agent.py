@@ -27,21 +27,40 @@ def _format_schema(schema: dict) -> str:
     return "\n".join(lines)
 
 
-def _call_llm(system_prompt, message) -> tuple[str, int, int]:
-    """Envoie un message à l'API Anthropic et retourne le texte + tokens consommés"""
+def _call_llm_with_retry(system_prompt, message, max_retries) -> tuple[str, int, int]:
+    """Envoie un message à l'API Anthropic avec retry sur erreurs transitoires."""
+
+    if max_retries < 1:
+        raise ValueError("max_retries doit être >= 1")
 
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-    response = client.messages.create(
-        model=config.MODEL,
-        max_tokens=config.MAX_TOKENS,
-        system=system_prompt,
-        messages=[{"role": "user", "content": message}],
-    )
-    return (
-        response.content[0].text,
-        response.usage.input_tokens,
-        response.usage.output_tokens,
-    )
+    # satisfait le type checker : la boucle garantit qu'on l'écrase avant usage
+    last_error: Exception = RuntimeError("unreachable")
+    for attempt in range(max_retries):
+        try:
+            response = client.messages.create(
+                model=config.MODEL,
+                max_tokens=config.MAX_TOKENS,
+                system=system_prompt,
+                messages=[{"role": "user", "content": message}],
+            )
+            return (
+                response.content[0].text,
+                response.usage.input_tokens,
+                response.usage.output_tokens,
+            )
+        except anthropic.AuthenticationError:
+            raise  # clé invalide : pas transitoire, retry inutile
+        except (
+            anthropic.RateLimitError,
+            anthropic.APITimeoutError,
+            anthropic.APIConnectionError,
+            anthropic.APIStatusError,
+        ) as e:
+            last_error = e
+            if attempt < max_retries - 1:
+                time.sleep(2**attempt)
+    raise last_error
 
 
 def _extract_sql(text) -> str:
@@ -54,11 +73,14 @@ def _extract_sql(text) -> str:
     return match.group(1).strip()
 
 
-def agent_main(question: str, eval_question_id: str | None = None) -> tuple[str, pd.DataFrame]:
+def agent_main(
+    question: str, eval_question_id: str | None = None
+) -> tuple[str, pd.DataFrame]:
     """Traduit une question métier en DataFrame via génération et exécution de SQL"""
 
-    schema = load_schema()
-    schema_str = _format_schema(schema)
+    max_retries = 3
+
+    schema_str = _format_schema(load_schema())
 
     with open(
         Path(__file__).parent / "prompts" / "system_prompt.md", encoding="utf-8"
@@ -77,11 +99,24 @@ def agent_main(question: str, eval_question_id: str | None = None) -> tuple[str,
     sql_generated = None
     input_tokens = 0
     output_tokens = 0
+    df: pd.DataFrame | None = None
 
     try:
-        text, input_tokens, output_tokens = _call_llm(system_prompt, message_to_llm)
-        sql_generated = _extract_sql(text)
-        df = execute_query(sql_generated)
+        for attempt in range(max_retries):
+            text, input_tokens, output_tokens = _call_llm_with_retry(
+                system_prompt, message_to_llm, max_retries
+            )
+            sql_generated = _extract_sql(text)
+            try:
+                df = execute_query(sql_generated)
+                break
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                if attempt == max_retries - 1:
+                    raise
+                message_to_llm += (
+                    f"\n\nErreur SQL à corriger : {e}\nSQL tenté : {sql_generated}"
+                )
+
         log_interaction(
             question=question,
             sql_generated=sql_generated,
@@ -93,7 +128,7 @@ def agent_main(question: str, eval_question_id: str | None = None) -> tuple[str,
         )
         return sql_generated, df
 
-    except Exception as exc:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         # Catch-all - loggue avant de re-lever pour persister l'erreur quelle que soit son origine
         log_interaction(
             question=question,
@@ -102,7 +137,7 @@ def agent_main(question: str, eval_question_id: str | None = None) -> tuple[str,
             latency_ms=int((time.perf_counter() - start) * 1000),
             input_tokens=input_tokens,
             output_tokens=output_tokens,
-            error_message=str(exc),
+            error_message=str(e),
             eval_question_id=eval_question_id,
         )
         raise
