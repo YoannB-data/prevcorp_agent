@@ -1,3 +1,4 @@
+# pylint: disable=duplicate-code
 """Tests unitaires pour log_interaction() — chaque test contrôle LOGS_DB_PATH via monkeypatch
 pour ne jamais toucher la base de logs réelle du projet."""
 
