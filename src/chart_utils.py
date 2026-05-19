@@ -19,13 +19,16 @@ def try_build_chart(df: pd.DataFrame) -> go.Figure | None:
 
     date_cols = [c for c in df.columns if pd.api.types.is_datetime64_any_dtype(df[c])]
     if not date_cols:
-        # Tentative de détection sur colonnes object dont le nom évoque une date
+        # DuckDB retourne souvent les dates d'agrégation comme strings, pas datetime64
         date_cols = [
-            c for c in df.select_dtypes(include="object").columns
-            if any(kw in c.lower() for kw in ("date", "mois", "annee", "année", "period"))
+            c
+            for c in df.select_dtypes(include="object").columns
+            if any(
+                kw in c.lower() for kw in ("date", "mois", "annee", "année", "period")
+            )
         ]
         if date_cols:
-            df = df.copy()
+            df = df.copy()  # évite SettingWithCopyWarning sur une slice pandas
             df[date_cols[0]] = pd.to_datetime(df[date_cols[0]], errors="coerce")
             df = df.dropna(subset=[date_cols[0]])
             if len(df) < 2:

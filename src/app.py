@@ -7,20 +7,25 @@ from src.chart_utils import try_build_chart
 
 st.set_page_config(page_title="PrevCorp Agent", layout="wide")
 
+# Guard - Streamlit reexécute le script entier à chaque interaction utilisateur
 if "history" not in st.session_state:
     st.session_state.history = []
 
 st.title("PrevCorp Agent")
 st.subheader("Votre question")
 
-question = st.text_area("", placeholder="Ex : Combien de dossiers ouverts en 2024 ?", height=100)
+question = st.text_area(
+    "", placeholder="Ex : Combien de dossiers ouverts en 2024 ?", height=100
+)
 
 if st.button("Envoyer", type="primary", disabled=not question.strip()):
     try:
         with st.spinner("Requête en cours…"):
-            sql, result_df  = agent_main(question)
-        st.session_state.history.insert(0, {"question": question, "sql": sql, "result": result_df})
-    except Exception as e:
+            sql, result_df = agent_main(question)
+        st.session_state.history.insert(
+            0, {"question": question, "sql": sql, "result": result_df}
+        )
+    except Exception as e:  # pylint: disable=broad-exception-caught
         st.error(f"Erreur lors de l'exécution : {e}")
 
 st.divider()
