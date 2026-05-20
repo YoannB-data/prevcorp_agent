@@ -9,8 +9,11 @@ import pandas as pd
 
 from src import config
 from src.duckdb_executor import execute_query
+from src.few_shot_selector import format_few_shot, select_examples
 from src.logger import log_interaction
 from src.schema_loader import load_schema
+
+_MAX_RETRIES = 3
 
 
 def _format_schema(schema: dict) -> str:
@@ -39,6 +42,7 @@ def _call_llm_with_retry(system_prompt, message, max_retries) -> tuple[str, int,
             response = client.messages.create(
                 model=config.MODEL,
                 max_tokens=config.MAX_TOKENS,
+                temperature=0,
                 system=system_prompt,
                 messages=[{"role": "user", "content": message}],
             )
@@ -76,9 +80,8 @@ def agent_main(
 ) -> tuple[str, pd.DataFrame]:
     """Traduit une question métier en DataFrame via génération et exécution de SQL"""
 
-    max_retries = 3
-
     schema_str = _format_schema(load_schema())
+    few_shot_str = format_few_shot(select_examples(question))
 
     with open(
         Path(__file__).parent / "prompts" / "system_prompt.md", encoding="utf-8"
@@ -86,6 +89,7 @@ def agent_main(
         system_prompt = f.read()
 
     message_to_llm = f"""
+        {few_shot_str}
         # Question du métier :
         {question}
         # Dataset de l'entreprise :
@@ -100,16 +104,17 @@ def agent_main(
     df: pd.DataFrame | None = None
 
     try:
-        for attempt in range(max_retries):
+        for attempt in range(_MAX_RETRIES):
             text, input_tokens, output_tokens = _call_llm_with_retry(
-                system_prompt, message_to_llm, max_retries
+                system_prompt, message_to_llm, _MAX_RETRIES
             )
             sql_generated = _extract_sql(text)
+            # print(f"[debug] SQL généré : {sql_generated}")
             try:
                 df = execute_query(sql_generated)
                 break
             except Exception as e:  # pylint: disable=broad-exception-caught
-                if attempt == max_retries - 1:
+                if attempt == _MAX_RETRIES - 1:
                     raise
                 message_to_llm += (
                     f"\n\nErreur SQL à corriger : {e}\nSQL tenté : {sql_generated}"
@@ -122,6 +127,8 @@ def agent_main(
             latency_ms=int((time.perf_counter() - start) * 1000),
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            cost_usd=(input_tokens * config.COST_PER_INPUT_TOKEN)
+            + (output_tokens * config.COST_PER_OUTPUT_TOKEN),
             eval_question_id=eval_question_id,
         )
         return sql_generated, df
@@ -135,6 +142,8 @@ def agent_main(
             latency_ms=int((time.perf_counter() - start) * 1000),
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            cost_usd=(input_tokens * config.COST_PER_INPUT_TOKEN)
+            + (output_tokens * config.COST_PER_OUTPUT_TOKEN),
             error_message=str(e),
             eval_question_id=eval_question_id,
         )
