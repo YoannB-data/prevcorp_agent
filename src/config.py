@@ -13,3 +13,9 @@ MAX_TOKENS = 1024
 
 MANIFEST_PATH = Path(os.getenv("MANIFEST_PATH"))
 DUCKDB_PATH = Path(os.getenv("DUCKDB_PATH"))
+
+LOGS_JSONL_PATH = Path("logs/interactions.jsonl")
+
+# Pricing Anthropic — claude-sonnet-4-6
+COST_PER_INPUT_TOKEN: float = 3.0 / 1_000_000  # $3 / 1M tokens
+COST_PER_OUTPUT_TOKEN: float = 15.0 / 1_000_000  # $15 / 1M tokens
