@@ -2,7 +2,8 @@
 .pytest_cache/
 .venv/
 __pycache__/
-evals/reports/
+evals/reports/*
+!evals/reports/latest.json
 logs/
 .env
 CLAUDE.md
