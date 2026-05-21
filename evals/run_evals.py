@@ -2,13 +2,17 @@
 
 import datetime
 import math
+import sys
 from pathlib import Path
 
 import pandas as pd
 import yaml
 
-from src.agent import agent_main
-from src.duckdb_executor import execute_query
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.agent import agent_main  # pylint: disable=wrong-import-position
+from src.duckdb_executor import \
+    execute_query  # pylint: disable=wrong-import-position
 
 EVAL_FILE = Path(__file__).parent / "eval_set.yml"
 
@@ -25,6 +29,24 @@ def _compare_scalar(df_a: pd.DataFrame, df_r: pd.DataFrame) -> tuple[bool, str]:
     if passed:
         return True, ""
     return False, f"agent={val_a}, ref={val_r}"
+
+
+def _compare_named_scalar(
+    df_a: pd.DataFrame, df_r: pd.DataFrame, _value_column: str
+) -> tuple[bool, str]:
+    """Cherche la valeur scalaire de référence dans n'importe quelle colonne du résultat agent."""
+
+    val_r = df_r.iloc[0, 0]
+    for col in df_a.columns:
+        try:
+            val_a = df_a[col].iloc[0]
+            if math.isclose(float(val_a), float(val_r), rel_tol=1e-6):
+                return True, ""
+        except (TypeError, ValueError):
+            if df_a[col].iloc[0] == val_r:
+                return True, ""
+    first_row = df_a.to_dict("records")[0]
+    return False, f"valeur attendue {val_r} absente (colonnes : {first_row})"
 
 
 def _compare_row_count(df_a: pd.DataFrame, df_r: pd.DataFrame) -> tuple[bool, str]:
@@ -76,6 +98,8 @@ def _compare(
     match compare:
         case "scalar":
             return _compare_scalar(df_agent, df_ref)
+        case "named_scalar":
+            return _compare_named_scalar(df_agent, df_ref, key_column)
         case "row_count":
             return _compare_row_count(df_agent, df_ref)
         case "key_set":
@@ -84,6 +108,24 @@ def _compare(
             return _compare_exact_sorted(df_agent, df_ref, key_column)
         case _:
             return False, f"mode de comparaison inconnu : {compare}"
+
+
+def _write_latest_json(results: list[dict], now: datetime.datetime) -> None:
+    """Écrit evals/reports/latest.json avec les stats de la dernière évaluation."""
+
+    skipped = sum(1 for r in results if r["status"] == "SKIP")
+    passed = sum(1 for r in results if r["status"] == "PASS")
+    evaluated = len(results) - skipped
+    score_pct = round(passed / evaluated * 100, 1) if evaluated > 0 else 0.0
+
+    data = {
+        "date": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "passed": passed,
+        "evaluated": evaluated,
+        "score_pct": score_pct,
+    }
+    path = Path(__file__).parent / "reports" / "latest.json"
+    path.write_text(__import__("json").dumps(data, indent=2), encoding="utf-8")
 
 
 def run_single_eval(item: dict) -> dict:
@@ -99,7 +141,7 @@ def run_single_eval(item: dict) -> dict:
         return {"id": qid, "question": question, "status": "SKIP", "detail": ""}
 
     try:
-        df_agent = agent_main(question, eval_question_id=qid)
+        _, df_agent = agent_main(question, eval_question_id=qid)
         df_ref = execute_query(reference_sql)
         passed, detail = _compare(compare, key_column, df_agent, df_ref)
         return {
@@ -117,7 +159,7 @@ def run_single_eval(item: dict) -> dict:
 # ─────────────────────────────────────────────
 
 
-def write_report(results: list[dict]) -> None:
+def write_report(results: list[dict]) -> None:  # pylint: disable=too-many-locals
     """Écrit le rapport d'évaluation dans evals/reports/report_YYYYMMDD_HHMMSS.md."""
 
     now = datetime.datetime.now()
@@ -128,19 +170,26 @@ def write_report(results: list[dict]) -> None:
     skipped = sum(1 for r in results if r["status"] == "SKIP")
     passed = sum(1 for r in results if r["status"] == "PASS")
     total = len(results)
+    evaluated_ct = total - skipped
+    score_pct = round(passed / evaluated_ct * 100, 1) if evaluated_ct > 0 else 0
 
     lines = [
         f"# Rapport d'évaluation — {now.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
-        f"**Score : {passed}/{total - skipped} PASS**  ",
+        f"**Score : {passed}/{evaluated_ct} PASS ({score_pct}%)**  ",
         "",
-        "| Statut | Nombre |",
-        "|--------|--------|",
+        "| Statut | Nombre | % évalués |",
+        "|--------|--------|-----------|",
     ]
     for status in ("PASS", "FAIL", "ERROR", "SKIP"):
-        lines.append(
-            f"| {status} | {sum(1 for r in results if r['status'] == status)} |"
-        )
+        count = sum(1 for r in results if r["status"] == status)
+        if status == "SKIP":
+            pct_str = "—"
+        else:
+            pct_str = (
+                f"{round(count / evaluated_ct * 100, 1)}%" if evaluated_ct > 0 else "—"
+            )
+        lines.append(f"| {status} | {count} | {pct_str} |")
 
     lines += [
         "",
@@ -197,12 +246,16 @@ def run_evals(ids: list[str] | None = None) -> list[dict]:
     skipped = sum(1 for r in results if r["status"] == "SKIP")
     passed = sum(1 for r in results if r["status"] == "PASS")
     print("\n" + "=" * 60)
-    print(f"RÉSULTATS : {passed}/{len(results) - skipped} PASS")
+    evaluated = len(results) - skipped
+    pct = round(passed / evaluated * 100, 1) if evaluated > 0 else 0.0
+    print(f"RÉSULTATS : {passed}/{evaluated} PASS ({pct}%)")
     for status in ("PASS", "FAIL", "ERROR", "SKIP"):
         print(f"  {status:<6}: {sum(1 for r in results if r['status'] == status)}")
     print("=" * 60)
 
     write_report(results)
+    if ids is None:  # uniquement sur un run global
+        _write_latest_json(results, datetime.datetime.now())
     return results
 
 

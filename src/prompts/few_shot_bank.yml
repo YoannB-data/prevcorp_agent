@@ -1,0 +1,72 @@
+examples:
+  - id: anti_join
+    keywords: ["rien perçu", "aucun paiement", "aucune cotisation", "sans règlement", "impayé"]
+    question: "Liste des contrats pour lesquels aucune cotisation n'a été perçue en 2024."
+    sql: |
+      SELECT c.contrat_id, c.contrat_numero
+      FROM dim__contrats c
+      LEFT JOIN fct__cotisations cot
+        ON c.contrat_id = cot.contrat_id
+        AND YEAR(cot.echeance_date) = 2024
+      WHERE cot.cotisation_id IS NULL
+
+  - id: filtre_exclusif
+    keywords: ["n'ont que", "uniquement", "seulement", "qu'un seul"]
+    question: "Dossiers d'invalidité qui n'ont qu'une ressource de type Rente SS."
+    sql: |
+      SELECT dossier_id
+      FROM fct__ressources
+      GROUP BY dossier_id
+      HAVING COUNT(DISTINCT ressource_type) = 1
+         AND MAX(ressource_type) = 'Rente SS'
+
+  - id: exclusion_type
+    keywords: ["autres que", "hors", "sauf", "ni", "pas de"]
+    question: "Dossiers ayant des ressources autres que PE."
+    sql: |
+      SELECT DISTINCT dossier_id
+      FROM fct__ressources
+      WHERE dossier_id NOT IN (
+        SELECT DISTINCT dossier_id FROM fct__ressources
+        WHERE ressource_type = 'PE'
+      )
+
+  - id: nom_entreprise
+    keywords: ["contrat", "entreprise", "client", "société"]
+    question: "Liste des paiements sur le contrat de l'entreprise Dupont."
+    sql: |
+      SELECT p.*
+      FROM fct__paiements p
+      JOIN fct__dossiers d ON p.dossier_id = d.dossier_id
+      WHERE d.entreprise_nom ILIKE '%Dupont%'
+
+  - id: granularite_mensuelle
+    keywords: ["période", "mois", "activité", "saisonnalité", "trimestre"]
+    question: "À quelle période de l'année a-t-on le plus de cotisations ?"
+    sql: |
+      SELECT MONTH(echeance_date) AS mois, SUM(cotisation_montant) AS total
+      FROM fct__cotisations
+      GROUP BY mois
+      ORDER BY total DESC
+
+  - id: granularite_mensuelle
+    keywords: ["par mois", "mois", "mensuel", "par période", "période"]
+    question: "Nombre de dossiers ouverts par mois en 2024."
+    sql: |
+      SELECT DATE_TRUNC('month', creation_date) AS mois,
+            COUNT(*) AS nb_dossiers
+      FROM fct__dossiers
+      WHERE YEAR(creation_date) = 2024
+      GROUP BY mois
+      ORDER BY mois
+
+  - id: montant_fiscal_dossier
+    keywords: ["montant fiscal", "déclarer", "dgfip", "pas", "prélèvement à la source"]
+    question: "Quel est le montant fiscal 2024 à déclarer pour le dossier DOS123456 ?"
+    sql: |
+      SELECT SUM(pas_montant) AS montant_fiscal
+      FROM fct__paiements
+      WHERE dossier_id = (
+        SELECT dossier_id FROM fct__dossiers WHERE dossier_numero = 'DOS123456'
+      )
+      AND YEAR(paiement_date) = 2024

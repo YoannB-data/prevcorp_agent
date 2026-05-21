@@ -2,10 +2,10 @@
 
 import json
 
-from src.config import MANIFEST_PATH
+from src.config import MANIFEST_PATH, SEMANTIC_MANIFEST_PATH
 
 
-def load_schema() -> dict:
+def load_schema() -> dict[str, dict]:
     """Lit le manifest dbt et retourne le schéma des modèles marts"""
 
     # Guard - fichier absent ou MANIFEST_PATH non configuré
@@ -20,10 +20,16 @@ def load_schema() -> dict:
         if not data["nodes"]:
             raise ValueError("manifest.json ne contient aucun node")
 
+        excluded_models = {"metricflow_time_spine"}
+
         for _, value in data["nodes"].items():
+            table_name = value["name"]  # ex: "dim__assures"
             # On ne garde que les modèles du layer marts (pas sources, tests, snapshots…)
-            if ("marts" in value["path"]) and (value["resource_type"] == "model"):
-                table_name = value["name"]  # ex: "dim__assures"
+            if (
+                "marts" in value["path"]
+                and value["resource_type"] == "model"
+                and table_name not in excluded_models
+            ):
 
                 # Guard - colonnes vides, modèle déclaré mais pas encore documenté dans dbt
                 if not value["columns"]:
@@ -47,3 +53,32 @@ def load_schema() -> dict:
             )
 
     return schema
+
+
+def load_metrics() -> dict[str, dict]:
+    """Lit le semantic_manifest dbt et retourne les métriques disponibles"""
+
+    # Guard - fichier absent ou SEMANTIC_MANIFEST_PATH non configuré
+    if SEMANTIC_MANIFEST_PATH is None or not SEMANTIC_MANIFEST_PATH.exists():
+        raise FileNotFoundError(
+            f"semantic_manifest.json introuvable : {SEMANTIC_MANIFEST_PATH}"
+        )
+
+    with open(SEMANTIC_MANIFEST_PATH, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        metrics = {}
+
+        # Guard - semantic manifest vide, probablement un dbt parse qui n'a pas tourné
+        if not data["metrics"]:
+            raise ValueError("semantic_manifest.json ne contient aucune métrique")
+
+        for metric in data["metrics"]:
+            name = metric["name"]
+            metrics[name] = {
+                "label": metric["label"],
+                "description": metric.get("description", ""),
+                "type": metric["type"],
+                "measure": metric["type_params"]["measure"]["name"],
+            }
+
+    return metrics
