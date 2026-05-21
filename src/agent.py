@@ -11,9 +11,7 @@ from src import config
 from src.duckdb_executor import execute_query
 from src.few_shot_selector import format_few_shot, select_examples
 from src.logger import log_interaction
-from src.schema_loader import load_schema
-
-_MAX_RETRIES = 3
+from src.schema_loader import load_metrics, load_schema
 
 
 def _format_schema(schema: dict) -> str:
@@ -26,6 +24,21 @@ def _format_schema(schema: dict) -> str:
         lines.append("Colonnes :")
         for col_name, col_desc in table_info["columns"].items():
             lines.append(f"  - {col_name} : {col_desc}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _format_metrics(metrics: dict) -> str:
+    """Formate les métriques en texte lisible pour injection dans le prompt"""
+
+    lines = []
+    for name, info in metrics.items():
+        lines.append(f"Métrique : {name}")
+        lines.append(f"Label : {info['label']}")
+        if info.get("description"):
+            lines.append(f"Description : {info['description']}")
+        lines.append(f"Type : {info['type']}")
+        lines.append(f"Mesure : {info['measure']}")
         lines.append("")
     return "\n".join(lines)
 
@@ -75,27 +88,35 @@ def _extract_sql(text) -> str:
     return match.group(1).strip()
 
 
+_MAX_RETRIES = 3
+_SCHEMA = _format_schema(load_schema())
+_METRICS = _format_metrics(load_metrics())
+_SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "system_prompt.md").read_text(
+    encoding="utf-8"
+)
+
+
+def _build_message_to_llm(question: str) -> str:
+    """Construit le message utilisateur à envoyer à l'API."""
+
+    few_shot_str = format_few_shot(select_examples(question))
+    return f"""
+        {few_shot_str}
+        # Question du métier :
+        {question}
+        # Dataset de l'entreprise :
+        {_SCHEMA}
+        # Semantic layer :
+        {_METRICS}
+        """
+
+
 def agent_main(
     question: str, eval_question_id: str | None = None
 ) -> tuple[str, pd.DataFrame]:
     """Traduit une question métier en DataFrame via génération et exécution de SQL"""
 
-    schema_str = _format_schema(load_schema())
-    few_shot_str = format_few_shot(select_examples(question))
-
-    with open(
-        Path(__file__).parent / "prompts" / "system_prompt.md", encoding="utf-8"
-    ) as f:
-        system_prompt = f.read()
-
-    message_to_llm = f"""
-        {few_shot_str}
-        # Question du métier :
-        {question}
-        # Dataset de l'entreprise :
-        {schema_str}
-        """
-
+    message_to_llm = _build_message_to_llm(question)
     start = time.perf_counter()
     # Initialisés ici pour rester accessibles dans le except si _call_llm échoue avant de les setter
     sql_generated = None
@@ -106,7 +127,7 @@ def agent_main(
     try:
         for attempt in range(_MAX_RETRIES):
             text, input_tokens, output_tokens = _call_llm_with_retry(
-                system_prompt, message_to_llm, _MAX_RETRIES
+                _SYSTEM_PROMPT, message_to_llm, _MAX_RETRIES
             )
             sql_generated = _extract_sql(text)
             # print(f"[debug] SQL généré : {sql_generated}")
