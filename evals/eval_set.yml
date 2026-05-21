@@ -6,7 +6,7 @@
 meta:
   version: "0.1"
   date: "2025"
-  total: 65
+  total: 71
   categories:
     - agregation
     - liste
@@ -29,6 +29,10 @@ meta:
     - key_set       # ensemble de clés identique (top_n)
     - exact_sorted  # tri sur key_column + comparaison valeurs
     - skip          # rag / hors_scope — pas d'évaluation SQL
+
+# Idéal de question à implémenter
+# * Peux-tu me donner les prestations totales versées, agrégées par mois
+# * Peux-tu me donner l'encaissement total des cotisations, agrégé par mois
 
 questions:
 
@@ -160,6 +164,143 @@ questions:
       FROM fct__dossiers
       WHERE risque = 'Invalidité'
         AND est_en_cours = TRUE
+
+  # ─────────────────────────────────────────────
+  # SINISTRALITE / RETENTION
+  # ─────────────────────────────────────────────
+
+  - id: Q079
+    question: "Quel est le ratio sinistres/primes (S/P) global pour l'année 2024 ?"
+    categorie: agregation
+    difficulte: hard
+    scope: sql
+    compare: skip #named_scalar
+    key_column: ratio_sp
+    tables: [fct__paiements, fct__cotisations]
+    note: "Deux sous-agrégats indépendants (paiements / cotisations) combinés en une division — pas de jointure directe entre les deux tables"
+    reference_sql: >
+      WITH sinistres AS (
+          SELECT SUM(brut_montant) AS total_sinistres
+          FROM fct__paiements
+          WHERE YEAR(paiement_date) = 2024
+      ),
+      primes AS (
+          SELECT SUM(cotisation_montant) AS total_primes
+          FROM fct__cotisations
+          WHERE YEAR(encaissement_date) = 2024
+      )
+      SELECT ROUND(total_sinistres / NULLIF(total_primes, 0), 4) AS ratio_sp
+      FROM sinistres, primes
+
+  - id: Q080
+    question: "Donne-moi le ratio S/P par segment de marché pour 2024, trié par segment."
+    categorie: agregation
+    difficulte: hard
+    scope: sql
+    compare: skip # exact_sorted
+    key_column: segment_nom
+    tables: [fct__paiements, fct__cotisations]
+    note: "Agrégation par segment sur deux tables distinctes puis FULL OUTER JOIN — segments avec sinistres mais sans cotisations (ou inversement) doivent apparaître"
+    reference_sql: >
+      WITH sinistres AS (
+          SELECT segment_nom, SUM(brut_montant) AS total_sinistres
+          FROM fct__paiements
+          WHERE YEAR(paiement_date) = 2024
+          GROUP BY segment_nom
+      ),
+      primes AS (
+          SELECT segment_nom, SUM(cotisation_montant) AS total_primes
+          FROM fct__cotisations
+          WHERE YEAR(encaissement_date) = 2024
+          GROUP BY segment_nom
+      )
+      SELECT
+          COALESCE(s.segment_nom, p.segment_nom) AS segment_nom,
+          ROUND(COALESCE(s.total_sinistres, 0) / NULLIF(p.total_primes, 0), 4) AS ratio_sp
+      FROM sinistres s
+      FULL OUTER JOIN primes p USING(segment_nom)
+      ORDER BY segment_nom
+
+  - id: Q081
+    question: "Quels segments de marché ont un ratio sinistres/primes supérieur à 100 % en 2024 ?"
+    categorie: agregation
+    difficulte: hard
+    scope: sql
+    compare: skip # key_set
+    key_column: segment_nom
+    tables: [fct__paiements, fct__cotisations]
+    note: "Variante de Q080 avec filtre sur ratio > 1.0 — segments dégradés techniquement"
+    reference_sql: >
+      WITH sinistres AS (
+          SELECT segment_nom, SUM(brut_montant) AS total_sinistres
+          FROM fct__paiements
+          WHERE YEAR(paiement_date) = 2024
+          GROUP BY segment_nom
+      ),
+      primes AS (
+          SELECT segment_nom, SUM(cotisation_montant) AS total_primes
+          FROM fct__cotisations
+          WHERE YEAR(encaissement_date) = 2024
+          GROUP BY segment_nom
+      )
+      SELECT COALESCE(s.segment_nom, p.segment_nom) AS segment_nom
+      FROM sinistres s
+      FULL OUTER JOIN primes p USING(segment_nom)
+      WHERE COALESCE(s.total_sinistres, 0) / NULLIF(p.total_primes, 0) > 1.0
+
+  - id: Q082
+    question: "Quel est le taux de résiliation des contrats sur l'année 2024 ?"
+    categorie: agregation
+    difficulte: hard
+    scope: sql
+    compare: skip # named_scalar
+    key_column: taux_resiliation_2024
+    tables: [dim__contrats]
+    note: "Contrats actifs au 01/01/2024 (base de référence) — résiliés = fin_date dans l'année — taux = résiliés / actifs en début d'année"
+    reference_sql: >
+      SELECT ROUND(
+          COUNT(CASE WHEN YEAR(fin_date) = 2024 THEN 1 END) * 1.0 /
+          NULLIF(
+              COUNT(CASE WHEN debut_date < '2024-01-01'
+                          AND (fin_date IS NULL OR fin_date >= '2024-01-01')
+                    THEN 1 END),
+              0
+          ),
+          4
+      ) AS taux_resiliation_2024
+      FROM dim__contrats
+
+  - id: Q083
+    question: "Combien de contrats ont été résiliés par segment de marché en 2024 ?"
+    categorie: agregation
+    difficulte: easy
+    scope: sql
+    compare: skip # exact_sorted
+    key_column: segment_nom
+    tables: [dim__contrats]
+    note: "COUNT filtré sur YEAR(fin_date) = 2024, GROUP BY segment_nom"
+    reference_sql: >
+      SELECT segment_nom, COUNT(*) AS nb_resilies
+      FROM dim__contrats
+      WHERE YEAR(fin_date) = 2024
+      GROUP BY segment_nom
+      ORDER BY segment_nom
+
+  - id: Q084
+    question: "Liste des entreprises dont le contrat a été résilié en 2024, mais dont l'entreprise est toujours active dans le portefeuille."
+    categorie: liste
+    difficulte: medium
+    scope: sql
+    compare: skip # row_count
+    tables: [dim__contrats, fct__contrats_entreprises]
+    note: "Résiliation contrat en 2024 + entreprise_est_en_cours=TRUE — cas de rétention partielle : l'entreprise reste mais a perdu ce contrat"
+    reference_sql: >
+      SELECT ce.entreprise_nom, c.contrat_numero, c.segment_nom, c.fin_date
+      FROM dim__contrats c
+      JOIN fct__contrats_entreprises ce USING(contrat_id)
+      WHERE YEAR(c.fin_date) = 2024
+        AND ce.entreprise_est_en_cours = TRUE
+      ORDER BY c.fin_date
 
   # ─────────────────────────────────────────────
   # LISTE

@@ -110,6 +110,24 @@ def _compare(
             return False, f"mode de comparaison inconnu : {compare}"
 
 
+def _write_latest_json(results: list[dict], now: datetime.datetime) -> None:
+    """Écrit evals/reports/latest.json avec les stats de la dernière évaluation."""
+
+    skipped = sum(1 for r in results if r["status"] == "SKIP")
+    passed = sum(1 for r in results if r["status"] == "PASS")
+    evaluated = len(results) - skipped
+    score_pct = round(passed / evaluated * 100, 1) if evaluated > 0 else 0.0
+
+    data = {
+        "date": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "passed": passed,
+        "evaluated": evaluated,
+        "score_pct": score_pct,
+    }
+    path = Path(__file__).parent / "reports" / "latest.json"
+    path.write_text(__import__("json").dumps(data, indent=2), encoding="utf-8")
+
+
 def run_single_eval(item: dict) -> dict:
     """Évalue une question et retourne un dict avec id, question, status et detail."""
 
@@ -236,6 +254,8 @@ def run_evals(ids: list[str] | None = None) -> list[dict]:
     print("=" * 60)
 
     write_report(results)
+    if ids is None:  # uniquement sur un run global
+        _write_latest_json(results, datetime.datetime.now())
     return results
 
 
