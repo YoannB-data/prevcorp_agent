@@ -6,7 +6,7 @@
 meta:
   version: "0.1"
   date: "2025"
-  total: 71
+  total: 73
   categories:
     - agregation
     - liste
@@ -29,10 +29,6 @@ meta:
     - key_set       # ensemble de clés identique (top_n)
     - exact_sorted  # tri sur key_column + comparaison valeurs
     - skip          # rag / hors_scope — pas d'évaluation SQL
-
-# Idéal de question à implémenter
-# * Peux-tu me donner les prestations totales versées, agrégées par mois
-# * Peux-tu me donner l'encaissement total des cotisations, agrégé par mois
 
 questions:
 
@@ -151,6 +147,38 @@ questions:
       FROM dim__entreprises
       WHERE est_en_cours = TRUE
  
+  - id: Q085
+    question: "Peux-tu me donner les prestations totales versées, agrégées par mois ?"
+    categorie: agregation
+    difficulte: medium
+    scope: sql
+    compare: skip #exact_sorted
+    key_column: mois
+    tables: [fct__paiements]
+    note: "SUM(brut_montant) GROUP BY DATE_TRUNC(month) — toutes périodes, tri chronologique"
+    reference_sql: >
+      SELECT DATE_TRUNC('month', paiement_date) AS mois,
+             SUM(brut_montant) AS total_prestations
+      FROM fct__paiements
+      GROUP BY mois
+      ORDER BY mois
+
+  - id: Q086
+    question: "Peux-tu me donner l'encaissement total des cotisations, agrégé par mois ?"
+    categorie: agregation
+    difficulte: medium
+    scope: sql
+    compare: skip #exact_sorted
+    key_column: mois
+    tables: [fct__cotisations]
+    note: "SUM(cotisation_montant) GROUP BY DATE_TRUNC(month) — toutes périodes, tri chronologique"
+    reference_sql: >
+      SELECT DATE_TRUNC('month', encaissement_date) AS mois,
+             SUM(cotisation_montant) AS total_cotisations
+      FROM fct__cotisations
+      GROUP BY mois
+      ORDER BY mois
+
   - id: Q071
     question: "Quel est le salaire moyen de référence des assurés en invalidité en cours ?"
     categorie: agregation
