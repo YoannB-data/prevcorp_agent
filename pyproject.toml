@@ -40,4 +40,4 @@ per-file-ignores = { "evals/*.py" = ["E402"] }
 [tool.mypy]
 python_version = "3.12"
 ignore_missing_imports = true
-# Point de départ permissif — durcir progressivement avec strict = true
+disallow_untyped_defs = true

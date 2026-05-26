@@ -28,7 +28,7 @@ def _format_schema(schema: dict) -> str:
     return "\n".join(lines)
 
 
-def _format_metrics(metrics) -> str:
+def _format_metrics(metrics: dict) -> str:
     """Formate les métriques en texte lisible pour injection dans le prompt"""
 
     lines = []
@@ -43,7 +43,9 @@ def _format_metrics(metrics) -> str:
     return "\n".join(lines)
 
 
-def _call_llm_with_retry(system_prompt, message, max_retries) -> tuple[str, int, int]:
+def _call_llm_with_retry(
+    system_prompt: str, message: str, max_retries: int
+) -> tuple[str, int, int]:
     """Envoie un message à l'API Anthropic avec retry sur erreurs transitoires."""
 
     if max_retries < 1:
@@ -80,7 +82,7 @@ def _call_llm_with_retry(system_prompt, message, max_retries) -> tuple[str, int,
     raise last_error
 
 
-def _extract_sql(text) -> str:
+def _extract_sql(text: str) -> str:
     """Extrait le bloc SQL d'une réponse Markdown de l'API"""
 
     match = re.search(r"```sql\n(.*?)```", text, re.DOTALL)
