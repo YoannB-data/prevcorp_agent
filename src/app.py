@@ -33,9 +33,9 @@ with st.sidebar:
         st.rerun()
     st.divider()
     st.caption("Dataset PrevCorp · 2022–2025")
-    st.caption("~2 000 assurés")
-    st.caption("~3 000 contrats")
-    st.caption("~1 500 sinistres")
+    st.caption("~5 000 assurés")
+    st.caption("~2 500 contrats")
+    st.caption("~5 000 sinistres")
 
 st.divider()
 
