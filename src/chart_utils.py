@@ -16,7 +16,7 @@ def _is_year_col(series: pd.Series, col_name: str) -> bool:
     return series.between(1900, 2100).all()
 
 
-def try_build_chart(df: pd.DataFrame) -> go.Figure | None:  # pylint: disable=too-many-return-statements,too-many-branches
+def try_build_chart(df: pd.DataFrame) -> go.Figure | None:
     """Retourne une Figure Plotly adaptée au DataFrame, ou None si non pertinent."""
     if df is None or df.empty or len(df) < 2:
         return None
@@ -45,9 +45,7 @@ def try_build_chart(df: pd.DataFrame) -> go.Figure | None:  # pylint: disable=to
         date_cols = [
             c
             for c in df.select_dtypes(include="object").columns
-            if any(
-                kw in c.lower() for kw in ("date", "mois", "annee", "année", "period")
-            )
+            if any(kw in c.lower() for kw in ("date", "mois", "annee", "année", "period"))
         ]
         if date_cols:
             df = df.copy()

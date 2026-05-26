@@ -21,9 +21,7 @@ def _create_db(path):
 def test_base_absente(monkeypatch):
     """DUCKDB_PATH pointe vers un fichier inexistant : FileNotFoundError."""
 
-    monkeypatch.setattr(
-        "src.duckdb_executor.DUCKDB_PATH", Path("/inexistant/db.duckdb")
-    )
+    monkeypatch.setattr("src.duckdb_executor.DUCKDB_PATH", Path("/inexistant/db.duckdb"))
     with pytest.raises(FileNotFoundError):
         execute_query("SELECT 1")
 

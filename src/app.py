@@ -21,8 +21,7 @@ with st.sidebar:
         eval_data = json.loads(LATEST_EVAL_PATH.read_text(encoding="utf-8"))
         st.metric("Score eval set", f"{eval_data['score_pct']}%")
         st.caption(
-            f"{eval_data['passed']}/{eval_data['evaluated']} PASS"
-            f" · {eval_data['date'][:10]}"
+            f"{eval_data['passed']}/{eval_data['evaluated']} PASS · {eval_data['date'][:10]}"
         )
     else:
         st.caption("_Aucune évaluation disponible_")
@@ -52,9 +51,7 @@ if question := st.chat_input("Ex : Combien de dossiers ouverts en 2024 ?"):
     try:
         with st.spinner("Requête en cours…"):
             sql, result_df = agent_main(question)
-            st.session_state.history.append(
-                {"question": question, "sql": sql, "result": result_df}
-            )
+            st.session_state.history.append({"question": question, "sql": sql, "result": result_df})
         st.rerun()
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception as e:
         st.error(f"Erreur lors de l'exécution : {e}")

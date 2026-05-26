@@ -1,4 +1,3 @@
-# pylint: disable=duplicate-code
 """Tests unitaires pour log_interaction() — chaque test redirige LOGS_JSONL_PATH via monkeypatch
 pour ne jamais toucher le fichier de logs réel du projet."""
 
