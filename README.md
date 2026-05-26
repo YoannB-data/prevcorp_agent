@@ -114,3 +114,6 @@ Base en étoile :
 - [DuckDB](https://duckdb.org/) — moteur SQL embarqué
 - [Plotly](https://plotly.com/python/) — visualisations automatiques
 - [pandas](https://pandas.pydata.org/) — manipulation des résultats
+- [Ruff](https://github.com/astral-sh/ruff) — formatter + linter (remplace black, isort, flake8)
+- [mypy](https://mypy-lang.org/) — type checking statique
+- [pre-commit](https://pre-commit.com/) — hooks git locaux
