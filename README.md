@@ -33,7 +33,8 @@ Log JSONL (tokens, latence, coût)
 ```bash
 git clone <repo>
 cd prevcorp_agent
-uv sync
+uv sync --all-groups
+uv run pre-commit install
 ```
 
 ## Configuration
