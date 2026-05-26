@@ -28,7 +28,7 @@ def _format_schema(schema: dict) -> str:
     return "\n".join(lines)
 
 
-def _format_metrics(metrics: dict) -> str:
+def _format_metrics(metrics) -> str:
     """Formate les métriques en texte lisible pour injection dans le prompt"""
 
     lines = []
