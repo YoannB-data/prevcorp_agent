@@ -4,15 +4,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-ID_PATTERNS = ("_id", "_numero", "_num", "nom", "prenom", "code_")
-
-
-def _is_id_col(col_name: str) -> bool:
-    """Retourne True si le nom de colonne suggère un identifiant ou un libellé individuel.
-    Utilisé pour éviter de générer un graphique non pertinent sur des listes de détail.
-    """
-    return any(pat in col_name.lower() for pat in ID_PATTERNS)
-
 
 def _is_year_col(series: pd.Series, col_name: str) -> bool:
     """Détecte une colonne d'année entière (ex: 2022, 2023)."""
@@ -79,7 +70,7 @@ def try_build_chart(df: pd.DataFrame) -> go.Figure | None:  # pylint: disable=to
     non_numeric_cols = [c for c in df.columns if c not in numeric_cols]
     if non_numeric_cols:
         x_col = non_numeric_cols[0]
-        if df[x_col].nunique() > 20 or _is_id_col(x_col):
+        if df[x_col].nunique() > 20:
             return None
     else:
         df = df.reset_index()
