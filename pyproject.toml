@@ -6,13 +6,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "anthropic>=0.97.0",
-    "black==25.12.0",
     "duckdb>=1.5.2",
-    "isort>=8.0.1",
     "pandas>=3.0.2",
     "plotly>=6.7.0",
     "pydantic>=2.13.3",
-    "pylint>=4.0.5",
     "python-dotenv>=1.2.2",
     "pytz>=2026.2",
     "pyyaml>=6.0.3",
@@ -21,5 +18,26 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "mypy>=1.15.0",
+    "pre-commit>=4.2.0",
     "pytest>=9.0.3",
+    "ruff>=0.11.0",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
+# E/W = pycodestyle  F = pyflakes  I = isort  UP = pyupgrade
+per-file-ignores = { "evals/*.py" = ["E402"] }
+# E402 = module level import not at top (evals fait sys.path.insert avant imports)
+
+[tool.ruff.format]
+# Même comportement que black par défaut
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+disallow_untyped_defs = true

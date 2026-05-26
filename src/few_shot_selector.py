@@ -23,9 +23,7 @@ def select_examples(question: str, n: int = 2) -> list[dict]:
         key=lambda ex: sum(kw in question_lower for kw in ex["keywords"]),
         reverse=True,
     )
-    matched = [
-        ex for ex in scored if any(kw in question_lower for kw in ex["keywords"])
-    ]
+    matched = [ex for ex in scored if any(kw in question_lower for kw in ex["keywords"])]
     return matched[:n]
 
 

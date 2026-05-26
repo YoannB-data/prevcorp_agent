@@ -43,7 +43,9 @@ def _format_metrics(metrics: dict) -> str:
     return "\n".join(lines)
 
 
-def _call_llm_with_retry(system_prompt, message, max_retries) -> tuple[str, int, int]:
+def _call_llm_with_retry(
+    system_prompt: str, message: str, max_retries: int
+) -> tuple[str, int, int]:
     """Envoie un message à l'API Anthropic avec retry sur erreurs transitoires."""
 
     if max_retries < 1:
@@ -59,8 +61,10 @@ def _call_llm_with_retry(system_prompt, message, max_retries) -> tuple[str, int,
                 system=system_prompt,
                 messages=[{"role": "user", "content": message}],
             )
+            text_block = response.content[0]
+            assert isinstance(text_block, anthropic.types.TextBlock)
             return (
-                response.content[0].text,
+                text_block.text,
                 response.usage.input_tokens,
                 response.usage.output_tokens,
             )
@@ -78,7 +82,7 @@ def _call_llm_with_retry(system_prompt, message, max_retries) -> tuple[str, int,
     raise last_error
 
 
-def _extract_sql(text) -> str:
+def _extract_sql(text: str) -> str:
     """Extrait le bloc SQL d'une réponse Markdown de l'API"""
 
     match = re.search(r"```sql\n(.*?)```", text, re.DOTALL)
@@ -111,9 +115,7 @@ def _build_message_to_llm(question: str) -> str:
         """
 
 
-def agent_main(
-    question: str, eval_question_id: str | None = None
-) -> tuple[str, pd.DataFrame]:
+def agent_main(question: str, eval_question_id: str | None = None) -> tuple[str, pd.DataFrame]:
     """Traduit une question métier en DataFrame via génération et exécution de SQL"""
 
     message_to_llm = _build_message_to_llm(question)
@@ -134,12 +136,10 @@ def agent_main(
             try:
                 df = execute_query(sql_generated)
                 break
-            except Exception as e:  # pylint: disable=broad-exception-caught
+            except Exception as e:
                 if attempt == _MAX_RETRIES - 1:
                     raise
-                message_to_llm += (
-                    f"\n\nErreur SQL à corriger : {e}\nSQL tenté : {sql_generated}"
-                )
+                message_to_llm += f"\n\nErreur SQL à corriger : {e}\nSQL tenté : {sql_generated}"
 
         log_interaction(
             question=question,
@@ -152,9 +152,10 @@ def agent_main(
             + (output_tokens * config.COST_PER_OUTPUT_TOKEN),
             eval_question_id=eval_question_id,
         )
+        assert sql_generated is not None and df is not None
         return sql_generated, df
 
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception as e:
         # Catch-all - loggue avant de re-lever pour persister l'erreur quelle que soit son origine
         log_interaction(
             question=question,

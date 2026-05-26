@@ -10,9 +10,8 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.agent import agent_main  # pylint: disable=wrong-import-position
-from src.duckdb_executor import \
-    execute_query  # pylint: disable=wrong-import-position
+from src.agent import agent_main
+from src.duckdb_executor import execute_query
 
 EVAL_FILE = Path(__file__).parent / "eval_set.yml"
 
@@ -57,9 +56,7 @@ def _compare_row_count(df_a: pd.DataFrame, df_r: pd.DataFrame) -> tuple[bool, st
     return False, f"agent={len(df_a)} lignes, ref={len(df_r)} lignes"
 
 
-def _compare_key_set(
-    df_a: pd.DataFrame, df_r: pd.DataFrame, key_column: str
-) -> tuple[bool, str]:
+def _compare_key_set(df_a: pd.DataFrame, df_r: pd.DataFrame, key_column: str) -> tuple[bool, str]:
     """Compare les ensembles de clés sans tenir compte de l'ordre ni des doublons."""
 
     set_a = set(df_a[key_column])
@@ -150,7 +147,7 @@ def run_single_eval(item: dict) -> dict:
             "status": "PASS" if passed else "FAIL",
             "detail": detail,
         }
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception as e:
         return {"id": qid, "question": question, "status": "ERROR", "detail": str(e)}
 
 
@@ -159,7 +156,7 @@ def run_single_eval(item: dict) -> dict:
 # ─────────────────────────────────────────────
 
 
-def write_report(results: list[dict]) -> None:  # pylint: disable=too-many-locals
+def write_report(results: list[dict]) -> None:
     """Écrit le rapport d'évaluation dans evals/reports/report_YYYYMMDD_HHMMSS.md."""
 
     now = datetime.datetime.now()
@@ -186,9 +183,7 @@ def write_report(results: list[dict]) -> None:  # pylint: disable=too-many-local
         if status == "SKIP":
             pct_str = "—"
         else:
-            pct_str = (
-                f"{round(count / evaluated_ct * 100, 1)}%" if evaluated_ct > 0 else "—"
-            )
+            pct_str = f"{round(count / evaluated_ct * 100, 1)}%" if evaluated_ct > 0 else "—"
         lines.append(f"| {status} | {count} | {pct_str} |")
 
     lines += [
@@ -263,8 +258,6 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Runner d'évaluation PrevCorp Agent")
-    parser.add_argument(
-        "--ids", nargs="*", metavar="ID", help="IDs à évaluer (ex: Q012 Q034)"
-    )
+    parser.add_argument("--ids", nargs="*", metavar="ID", help="IDs à évaluer (ex: Q012 Q034)")
     args = parser.parse_args()
     run_evals(ids=args.ids)

@@ -12,7 +12,7 @@ def load_schema() -> dict[str, dict]:
     if MANIFEST_PATH is None or not MANIFEST_PATH.exists():
         raise FileNotFoundError(f"manifest.json introuvable : {MANIFEST_PATH}")
 
-    with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
+    with open(MANIFEST_PATH, encoding="utf-8") as f:
         data = json.load(f)
         schema = {}
 
@@ -30,12 +30,9 @@ def load_schema() -> dict[str, dict]:
                 and value["resource_type"] == "model"
                 and table_name not in excluded_models
             ):
-
                 # Guard - colonnes vides, modèle déclaré mais pas encore documenté dans dbt
                 if not value["columns"]:
-                    raise ValueError(
-                        f"Le modèle '{table_name}' ne contient aucune colonne"
-                    )
+                    raise ValueError(f"Le modèle '{table_name}' ne contient aucune colonne")
 
                 columns = {}
                 for col_name, col_info in value["columns"].items():
@@ -48,9 +45,7 @@ def load_schema() -> dict[str, dict]:
 
         # Guard - aucun modèle marts trouvé, manifest issu d'un autre layer (staging, seeds…)
         if not schema:
-            raise ValueError(
-                "manifest.json ne contient aucun modèle dans le layer marts"
-            )
+            raise ValueError("manifest.json ne contient aucun modèle dans le layer marts")
 
     return schema
 
@@ -60,11 +55,9 @@ def load_metrics() -> dict[str, dict]:
 
     # Guard - fichier absent ou SEMANTIC_MANIFEST_PATH non configuré
     if SEMANTIC_MANIFEST_PATH is None or not SEMANTIC_MANIFEST_PATH.exists():
-        raise FileNotFoundError(
-            f"semantic_manifest.json introuvable : {SEMANTIC_MANIFEST_PATH}"
-        )
+        raise FileNotFoundError(f"semantic_manifest.json introuvable : {SEMANTIC_MANIFEST_PATH}")
 
-    with open(SEMANTIC_MANIFEST_PATH, "r", encoding="utf-8") as f:
+    with open(SEMANTIC_MANIFEST_PATH, encoding="utf-8") as f:
         data = json.load(f)
         metrics = {}
 

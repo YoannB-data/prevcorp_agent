@@ -2,14 +2,14 @@
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from src import config
 
 _logger = logging.getLogger(__name__)
 
 
-def log_interaction(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def log_interaction(
     question: str,
     sql_generated: str | None,
     status: str,
@@ -22,7 +22,7 @@ def log_interaction(  # pylint: disable=too-many-arguments,too-many-positional-a
 ) -> None:
     """Append une ligne JSON dans le fichier de log des interactions."""
     record = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "eval_question_id": eval_question_id,
         "question": question,
         "sql_generated": sql_generated,

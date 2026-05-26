@@ -1,5 +1,9 @@
 anthropic
 duckdb
+pandas
+plotly
 pydantic
 python-dotenv
+pytz
 pyyaml
+streamlit

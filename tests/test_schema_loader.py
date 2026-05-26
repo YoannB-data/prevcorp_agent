@@ -56,9 +56,7 @@ MANIFEST_VALID = {
 def test_manifest_absent(monkeypatch):
     """MANIFEST_PATH pointe vers un fichier inexistant : FileNotFoundError."""
 
-    monkeypatch.setattr(
-        "src.schema_loader.MANIFEST_PATH", Path("/inexistant/manifest.json")
-    )
+    monkeypatch.setattr("src.schema_loader.MANIFEST_PATH", Path("/inexistant/manifest.json"))
     with pytest.raises(FileNotFoundError):
         load_schema()
 
