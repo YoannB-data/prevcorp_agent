@@ -3,6 +3,8 @@
 .pytest_cache/
 .ruff_cache/
 .venv/
+corpus/*.pdf
+qdrant_storage/
 __pycache__/
 evals/reports/*
 !evals/reports/latest.json
