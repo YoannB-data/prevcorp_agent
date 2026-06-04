@@ -8,10 +8,10 @@ import anthropic
 import pandas as pd
 
 from src import config
-from src.duckdb_executor import execute_query
-from src.few_shot_selector import format_few_shot, select_examples
 from src.logger import log_interaction
-from src.schema_loader import load_metrics, load_schema
+from src.structured.duckdb_executor import execute_query
+from src.structured.few_shot_selector import format_few_shot, select_examples
+from src.structured.schema_loader import load_metrics, load_schema
 
 
 def _format_schema(schema: dict) -> str:
@@ -95,7 +95,7 @@ def _extract_sql(text: str) -> str:
 _MAX_RETRIES = 3
 _SCHEMA = _format_schema(load_schema())
 _METRICS = _format_metrics(load_metrics())
-_SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "system_prompt.md").read_text(
+_SYSTEM_PROMPT = (Path(__file__).parent.parent / "prompts" / "system_prompt.md").read_text(
     encoding="utf-8"
 )
 

@@ -8,7 +8,7 @@ import yaml
 def _load_few_shot_bank() -> list[dict]:
     """Charge tous les exemples depuis few_shot_bank.yml."""
 
-    path = Path(__file__).parent / "prompts" / "few_shot_bank.yml"
+    path = Path(__file__).parent.parent / "prompts" / "few_shot_bank.yml"
     with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)["examples"]
 
