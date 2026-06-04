@@ -1,12 +1,16 @@
 """Application Streamlit pour l'agent PrevCorp."""
 
 import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import streamlit as st
 
-from src.agent import agent_main
-from src.chart_utils import try_build_chart
 from src.config import LATEST_EVAL_PATH
+from src.structured.agent import agent_main
+from src.structured.chart_utils import try_build_chart
 
 st.set_page_config(page_title="PrevCorp Agent", layout="centered")
 
