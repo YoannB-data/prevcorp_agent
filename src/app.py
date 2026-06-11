@@ -9,8 +9,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import streamlit as st
 
 from src.config import LATEST_EVAL_PATH
+from src.orchestrator import orchestrator_main
 from src.structured.chart_utils import try_build_chart
-from src.structured.sql_agent import agent_main
 
 st.set_page_config(page_title="PrevCorp Agent", layout="centered")
 
@@ -45,17 +45,32 @@ st.divider()
 for entry in st.session_state.history:
     with st.chat_message("user"):
         st.markdown(entry["question"])
-    # st.code(entry["sql"], language="sql")
-    st.dataframe(entry["result"], use_container_width=True)
-    fig = try_build_chart(entry["result"])
-    if fig is not None:
-        st.plotly_chart(fig, use_container_width=True)
+    if entry["route"] == "sql":
+        # st.code(entry["sql"], language="sql")
+        st.dataframe(entry["df"], use_container_width=True)
+        fig = try_build_chart(entry["df"])
+        if fig is not None:
+            st.plotly_chart(fig, use_container_width=True)
+    else:
+        with st.chat_message("assistant"):
+            st.markdown(entry["answer"])
+            if entry["sources"]:
+                st.caption("Sources : " + " · ".join(entry["sources"]))
 
 if question := st.chat_input("Ex : Combien de dossiers ouverts en 2024 ?"):
     try:
         with st.spinner("Requête en cours…"):
-            sql, result_df = agent_main(question)
-            st.session_state.history.append({"question": question, "sql": sql, "result": result_df})
+            result = orchestrator_main(question)
+            st.session_state.history.append(
+                {
+                    "question": question,
+                    "route": result.route,
+                    "sql": result.sql_generated,
+                    "df": result.df,
+                    "answer": result.answer,
+                    "sources": result.sources,
+                }
+            )
         st.rerun()
     except Exception as e:
         st.error(f"Erreur lors de l'exécution : {e}")
