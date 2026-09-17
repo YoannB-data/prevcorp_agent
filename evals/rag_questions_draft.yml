@@ -1,0 +1,226 @@
+# Livrable 3.1 — 25 questions cibles pour le corpus RAG PrevCorp
+# Spec d'entrée pour L3.2/L3.3 (génération du corpus) — pas encore un eval_set.yml exécutable
+# Contrats-ancres partie 1 : C87656 (CADRE, Santé et action sociale) / C83792 (ENSEMBLE DU PERSONNEL, Enseignement privé) / C39949 (NON CADRE, Agriculture)
+# Contrats-ancres partie 2 : CTR00296 (Métallurgie, CADRE) / CTR00341 (Transport routier, NON CADRE)
+# Catégories de documents retenues : Règlement / Notice CCN / Résumé des garanties / FAQ
+# (Notes techniques et Circulaires écartées du scope — décision session du 17/09/2026)
+
+questions:
+
+  # --- Partie 1 : Règlement / Notice CCN / Résumé (session 1) ---
+
+  - id: RC01
+    question: "Quel est le délai de franchise de la garantie Incapacité Temporaire de Travail du contrat C87656 ?"
+    type: chiffre_precis
+    contrat_cible: C87656
+    reponse_attendue: "90 jours"
+    sources_attendues: ["Résumé des garanties — C87656"]
+    corpus_a_contenir: "Résumé C87656 : ligne garantie ITT, franchise = 90 jours"
+
+  - id: RC02
+    question: "Le contrat C87656 prévoit-il un délai de carence avant la prise d'effet de la garantie ITT, et si oui lequel ?"
+    type: croisement
+    contrat_cible: C87656
+    reponse_attendue: "Oui, 3 mois"
+    sources_attendues: ["Règlement (principe général de carence)", "Résumé des garanties — C87656 (confirmation + durée)"]
+    corpus_a_contenir: >
+      Règlement : article définissant le principe de carence.
+      Résumé C87656 : ligne garantie ITT avec délai de carence = 3 mois.
+
+  - id: RC03
+    question: "Le concubin est-il inclus dans la désignation de bénéficiaire type du contrat C87656 ?"
+    type: croisement
+    contrat_cible: C87656
+    reponse_attendue: >
+      Oui selon la Notice CCN Santé et action sociale (concubin inclus sous condition de résidence commune),
+      alors que le Règlement générique ne le mentionne pas — écart délibéré entre les deux documents.
+    sources_attendues: ["Règlement", "Notice CCN — Santé et action sociale"]
+    corpus_a_contenir: >
+      Règlement : clause bénéficiaire type = conjoint ou pacsé, à défaut enfants, à défaut parents, à défaut ascendants, à défaut héritiers (pas de mention du concubin).
+      Notice CCN Santé et action sociale : même clause + concubin sous condition de résidence commune — écart délibéré à injecter.
+
+  - id: RC04
+    question: "Le contrat C39949 couvre-t-il un rapatriement à l'étranger en cas de sinistre ?"
+    type: sans_reponse
+    contrat_cible: C39949
+    reponse_attendue: "Non — cette couverture n'apparaît dans aucun document du corpus."
+    sources_attendues: ["Règlement"]
+    corpus_a_contenir: "Absence volontaire et vérifiée : aucune mention de rapatriement à l'étranger dans le Règlement ni ailleurs."
+
+  - id: RC05
+    question: "Y a-t-il un écart entre le Résumé des garanties du contrat C39949 et la Notice CCN Agriculture sur la garantie ITT ?"
+    type: croisement
+    contrat_cible: C39949
+    reponse_attendue: "Oui — Résumé C39949 indique une franchise ITT de 60 jours, alors que la Notice CCN Agriculture indique 90 jours."
+    sources_attendues: ["Résumé des garanties — C39949", "Notice CCN — Agriculture"]
+    corpus_a_contenir: "Résumé C39949 : franchise ITT = 60 jours. Notice CCN Agriculture : franchise ITT = 90 jours — écart délibéré à injecter."
+
+  - id: RC06
+    question: "Quel est le taux de couverture de l'invalidité sur le contrat C39949, pour les 3 catégories ?"
+    type: croisement
+    contrat_cible: C39949
+    reponse_attendue: "Taux de couverture pour l'invalidité de 1ère, 2ème et 3ème catégorie. [à compléter après régénération du corpus]"
+    sources_attendues: ["Règlement (mécanisme des 3 catégories)", "Résumé des garanties — C39949 (taux réels)"]
+    corpus_a_contenir: "Règlement : définition des 3 catégories d'invalidité. Résumé C39949 : taux de couverture par catégorie."
+
+  - id: RC07
+    question: "Quel est le taux de couverture de l'incapacité sur le contrat C87656, et la franchise associée ?"
+    type: croisement
+    contrat_cible: C87656
+    reponse_attendue: "Taux de couverture ITT + nombre de jours de franchise. [à compléter après régénération du corpus]"
+    sources_attendues: ["Règlement (mécanisme incapacité)", "Résumé des garanties — C87656 (taux + franchise réels)"]
+    corpus_a_contenir: "Règlement : définition de la garantie incapacité. Résumé C87656 : taux de couverture ITT + jours de franchise."
+
+  - id: RC08
+    question: "Quelles sont les garanties décès prévues par le contrat C83792 ?"
+    type: chiffre_precis
+    contrat_cible: C83792
+    reponse_attendue: "Liste/table des garanties décès : capitaux, rentes, frais d'obsèques, etc. [à compléter après régénération du corpus]"
+    sources_attendues: ["Résumé des garanties — C83792"]
+    corpus_a_contenir: "Résumé C83792 : table complète des garanties décès (capitaux, rentes, obsèques)."
+
+  - id: RC09
+    question: "Une rente éducation est-elle prévue sur le contrat C83792 ?"
+    type: chiffre_precis
+    contrat_cible: C83792
+    reponse_attendue: "Table des garanties rente éducation (montants par tranche d'âge). [à compléter après régénération du corpus]"
+    sources_attendues: ["Résumé des garanties — C83792"]
+    corpus_a_contenir: "Résumé C83792 : table de la rente éducation."
+
+  - id: RC10
+    question: "Y a-t-il des garanties optionnelles disponibles sur le contrat C87656 ?"
+    type: croisement
+    contrat_cible: C87656
+    reponse_attendue: "Liste des garanties optionnelles effectivement souscrites sur C87656. [à compléter après régénération du corpus]"
+    sources_attendues: ["Règlement (catalogue des garanties pouvant être optionnelles)", "Résumé des garanties — C87656 (celles effectivement souscrites)"]
+    corpus_a_contenir: "Règlement : catalogue des garanties optionnelles possibles. Résumé C87656 : lesquelles sont effectivement souscrites."
+
+  # --- Partie 2 : nouveaux contrats-ancres + paires Notice/FAQ, Règlement/FAQ, Règlement/Résumé (session du 17/09/2026) ---
+
+  - id: RC11
+    question: "Le contrat CTR00296 prévoit-il une franchise continue ou discontinue pour la garantie Incapacité Temporaire de Travail, et cela correspond-il au régime par défaut du Règlement ou à une dérogation CCN ?"
+    type: croisement
+    contrat_cible: CTR00296
+    reponse_attendue: "[à définir lors de la génération — franchise continue ou discontinue + statut base/dérogation]"
+    sources_attendues: ["Règlement (définition franchise continue/discontinue)", "Notice CCN — Métallurgie (franchise applicable au contrat)"]
+    corpus_a_contenir: "Règlement : définit les deux types de franchise (continue/discontinue). Notice CCN Métallurgie : précise le type retenu pour CTR00296."
+
+  - id: RC12
+    question: "Quel est le taux de la rente invalidité 2e catégorie sur la tranche B pour le contrat CTR00296 ?"
+    type: chiffre_precis
+    contrat_cible: CTR00296
+    reponse_attendue: "[à définir lors de la génération — taux en % sur TB]"
+    sources_attendues: ["Résumé des garanties — CTR00296"]
+    corpus_a_contenir: "Résumé CTR00296 : tableau des taux d'invalidité par catégorie et par tranche (TA/TB/TC)."
+
+  - id: RC13
+    question: "Le contrat CTR00296 applique-t-il la clause bénéficiaire type (conjoint puis enfants puis héritiers) ou une clause personnalisée déclarée à l'assureur ? Si personnalisée, quelle répartition ?"
+    type: croisement
+    contrat_cible: CTR00296
+    reponse_attendue: "[à définir lors de la génération — clause type ou personnalisée + répartition si applicable]"
+    sources_attendues: ["Notice CCN — Métallurgie (clause bénéficiaire applicable)", "Résumé des garanties — CTR00296 (mention de la clause si personnalisée)"]
+    corpus_a_contenir: "Notice CCN Métallurgie : rappel de la clause type. Résumé ou annexe CTR00296 : indication d'une clause personnalisée avec répartition (ou absence = clause type par défaut)."
+
+  - id: RC14
+    question: "Quel document justificatif faut-il fournir en cas de décès pour prouver la qualité de concubin ?"
+    type: fait_simple
+    contrat_cible: null
+    reponse_attendue: "[à définir lors de la génération — ex. attestation de domicile commun + justificatifs associés]"
+    sources_attendues: ["Règlement (annexe pièces justificatives)"]
+    corpus_a_contenir: "Règlement, annexe pièces justificatives : liste des documents à fournir pour justifier la qualité de concubin."
+
+  - id: RC15
+    question: "Quelle est la durée de la franchise avant le versement des indemnités journalières en cas d'arrêt maladie ordinaire ?"
+    type: fait_simple
+    contrat_cible: null
+    reponse_attendue: "[à définir lors de la génération — nombre de jours]"
+    sources_attendues: ["FAQ"]
+    corpus_a_contenir: "FAQ : question dédiée sur la franchise avant versement des IJ en maladie ordinaire."
+
+  - id: RC16
+    question: "Le jour de carence en congé maladie ordinaire est-il inclus dans le décompte de la franchise de 90 jours ?"
+    type: croisement
+    contrat_cible: null
+    reponse_attendue: "[à définir lors de la génération — inclus ou non]"
+    sources_attendues: ["Règlement (définition de la franchise)", "FAQ (précision sur le jour de carence)"]
+    corpus_a_contenir: "Règlement : définition générale de la franchise. FAQ : précision spécifique sur le traitement du jour de carence dans le décompte."
+
+  - id: RC17
+    question: "Quel est le taux de cotisation salarié pour la garantie rente de conjoint sur le contrat CTR00296 ?"
+    type: sans_reponse
+    contrat_cible: CTR00296
+    reponse_attendue: "Non — la garantie rente de conjoint n'est pas souscrite sur ce contrat, donc aucun taux n'existe dans le corpus."
+    sources_attendues: ["Résumé des garanties — CTR00296"]
+    corpus_a_contenir: >
+      ATTENTION avant validation définitive : vérifier explicitement dans la génération du corpus que la garantie
+      rente de conjoint est absente du Résumé CTR00296 (absence délibérée et vérifiée, pas une simple omission).
+
+  - id: RC18
+    question: "Quel est le montant du capital décès toutes causes pour un salarié célibataire sans personne à charge sur le contrat CTR00341 ?"
+    type: chiffre_precis
+    contrat_cible: CTR00341
+    reponse_attendue: "[à définir lors de la génération — % du salaire brut de référence]"
+    sources_attendues: ["Résumé des garanties — CTR00341"]
+    corpus_a_contenir: "Résumé CTR00341 : ligne capital décès toutes causes, situation célibataire sans personne à charge."
+
+  - id: RC19
+    question: "Le contrat CTR00341 applique-t-il une majoration de capital décès par enfant à charge, et à quel taux ?"
+    type: croisement
+    contrat_cible: CTR00341
+    reponse_attendue: "[à définir lors de la génération — oui/non + taux]"
+    sources_attendues: ["Notice CCN — Transport routier (principe de majoration)", "Résumé des garanties — CTR00341 (taux réel)"]
+    corpus_a_contenir: "Notice CCN Transport routier : mécanisme de majoration par enfant à charge. Résumé CTR00341 : taux appliqué."
+
+  - id: RC20
+    question: "Le taux de couverture invalidité 1re catégorie du contrat CTR00341 est-il le taux de base du Règlement ou une dérogation CCN ?"
+    type: croisement
+    contrat_cible: CTR00341
+    reponse_attendue: "[à définir lors de la génération — base ou dérogation]"
+    sources_attendues: ["Règlement (taux de base invalidité 1re catégorie)", "Résumé des garanties — CTR00341 (taux réel appliqué)"]
+    corpus_a_contenir: "Règlement : taux de base pour l'invalidité 1re catégorie. Résumé CTR00341 : taux effectivement appliqué, à comparer."
+
+  - id: RC21
+    question: "Quelles sont les 3 catégories d'invalidité et comment sont-elles déterminées ?"
+    type: fait_simple
+    contrat_cible: null
+    reponse_attendue: "[à définir lors de la génération — 1re/2e/3e catégorie + qui détermine (médecin conseil Sécurité sociale)]"
+    sources_attendues: ["FAQ"]
+    corpus_a_contenir: "FAQ : question dédiée sur les 3 catégories d'invalidité et l'autorité qui les détermine."
+
+  - id: RC22
+    question: "Le délai de prescription pour une action en incapacité de travail est-il de 2 ans ou de 5 ans sur le contrat CTR00341 ?"
+    type: croisement
+    contrat_cible: CTR00341
+    reponse_attendue: "[à définir lors de la génération — 2 ans ou 5 ans selon la Notice CCN]"
+    sources_attendues: ["Règlement (délai de prescription par défaut)", "Notice CCN — Transport routier (délai spécifique si dérogation)"]
+    corpus_a_contenir: "Règlement : délai de prescription générique. Notice CCN Transport routier : délai spécifique pour l'incapacité de travail si différent."
+
+  - id: RC23
+    question: "Que doit faire un salarié du contrat CTR00341 en arrêt de travail pour percevoir ses indemnités journalières, et à quel taux sont-elles versées ?"
+    type: croisement
+    contrat_cible: CTR00341
+    reponse_attendue: "[à définir lors de la génération — process de déclaration (FAQ) + taux de versement (Résumé)]"
+    sources_attendues: ["FAQ (process de déclaration d'arrêt)", "Résumé des garanties — CTR00341 (taux de versement des IJ)"]
+    corpus_a_contenir: >
+      FAQ : étapes opérationnelles de déclaration d'un arrêt de travail (démarches, délais, contact).
+      Résumé CTR00341 : taux de versement des indemnités journalières.
+      Point de vigilance L3.2 : la FAQ doit contenir un vrai process opérationnel, pas une reformulation vulgarisée du Règlement.
+
+  - id: RC24
+    question: "Sur un contrat où le concubin est reconnu bénéficiaire (ex. C87656), quel montant perçoit-il en cas de décès ?"
+    type: croisement
+    contrat_cible: C87656
+    reponse_attendue: "[à définir lors de la génération — montant identique à la clause bénéficiaire type, sous réserve d'éligibilité confirmée par la Notice CCN]"
+    sources_attendues: ["Notice CCN — Santé et action sociale (éligibilité du concubin)", "Résumé des garanties — C87656 (montant du capital décès)"]
+    corpus_a_contenir: "Réutilise l'écart déjà injecté pour RC03. Notice CCN : confirme l'éligibilité du concubin. Résumé : montant du capital."
+
+  - id: RC25
+    question: "Sur un contrat où le concubin n'est pas reconnu bénéficiaire, que devient le capital décès en son absence de désignation ?"
+    type: croisement
+    contrat_cible: null
+    reponse_attendue: "[à définir lors de la génération — application de la clause type : à défaut de conjoint/concubin reconnu, versement aux enfants, puis aux héritiers]"
+    sources_attendues: ["Règlement (clause bénéficiaire type)", "Notice CCN correspondante (confirmation de la non-éligibilité du concubin pour ce contrat)"]
+    corpus_a_contenir: >
+      Nécessite un contrat-ancre dont la Notice CCN NE prévoit PAS le concubin comme bénéficiaire — 
+      à choisir parmi C83792, C39949, CTR00296 ou CTR00341 lors de la génération du corpus (L3.3),
+      pour créer le contraste avec RC24.
