@@ -39,7 +39,7 @@ def retrieve(
         Liste de dicts avec text, source, doc_type, score
     """
     result = voyage_client.embed([question], model=EMBEDDING_MODEL, input_type="query")
-    query_vector = result.embeddings[0]
+    query_vector = [float(x) for x in result.embeddings[0]]
 
     search_filter = None
     if doc_type:
@@ -55,16 +55,20 @@ def retrieve(
         with_payload=True,
     ).points
 
-    return [
-        {
-            "text": hit.payload["text"],
-            "source": hit.payload["source"],
-            "doc_type": hit.payload["doc_type"],
-            "chunk_index": hit.payload["chunk_index"],
-            "score": round(hit.score, 4),
-        }
-        for hit in hits
-    ]
+    results = []
+    for hit in hits:
+        # Guard - with_payload=True garantit un payload non vide pour chaque hit
+        assert hit.payload is not None
+        results.append(
+            {
+                "text": hit.payload["text"],
+                "source": hit.payload["source"],
+                "doc_type": hit.payload["doc_type"],
+                "chunk_index": hit.payload["chunk_index"],
+                "score": round(hit.score, 4),
+            }
+        )
+    return results
 
 
 if __name__ == "__main__":

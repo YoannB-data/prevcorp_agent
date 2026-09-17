@@ -139,7 +139,8 @@ def ingest_pdf(pdf_path: Path) -> int:
         return 0
     chunks = chunk_text(text)
     result = voyage_client.embed(chunks, model=EMBEDDING_MODEL, input_type="document")
-    upsert_chunks(chunks, result.embeddings, pdf_path)
+    embeddings = [[float(x) for x in vector] for vector in result.embeddings]
+    upsert_chunks(chunks, embeddings, pdf_path)
     return len(chunks)
 
 

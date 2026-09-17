@@ -57,7 +57,9 @@ Question : {question}"""
         messages=[{"role": "user", "content": user_message}],
     )
 
-    answer = response.content[0].text
+    text_block = response.content[0]
+    assert isinstance(text_block, anthropic.types.TextBlock)
+    answer = text_block.text
     sources = list({chunk["source"] for chunk in chunks})
 
     return {
