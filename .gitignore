@@ -10,5 +10,4 @@ evals/reports/*
 !evals/reports/latest.json
 logs/
 .env
-CLAUDE.md
 sandbox.*
