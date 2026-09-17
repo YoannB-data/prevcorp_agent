@@ -10,8 +10,8 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.agent import agent_main
-from src.duckdb_executor import execute_query
+from src.structured.duckdb_executor import execute_query
+from src.structured.sql_agent import agent_main
 
 EVAL_FILE = Path(__file__).parent / "eval_set.yml"
 

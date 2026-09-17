@@ -61,7 +61,7 @@ La sidebar affiche le score du dernier run d'évaluation et le nombre de questio
 ### API Python
 
 ```python
-from src.agent import agent_main
+from src.structured.sql_agent import agent_main
 
 sql, df = agent_main("Combien de dossiers ouverts en 2024 ?")
 print(df)
@@ -81,7 +81,7 @@ Les résultats sont écrits dans `evals/reports/` (Markdown horodaté) et `evals
 ```
 src/
   app.py               # Interface Streamlit
-  agent.py             # Orchestration Claude API, retry, logging
+  sql_agent.py         # Orchestration Claude API, retry, logging
   config.py            # Paramètres (clés, chemins, modèle, coûts)
   schema_loader.py     # manifest.json (schéma) + semantic_manifest.json (métriques)
   duckdb_executor.py   # Exécution SQL en lecture seule
