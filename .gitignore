@@ -1,4 +1,4 @@
-.claude
+.claude/settings.json
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
