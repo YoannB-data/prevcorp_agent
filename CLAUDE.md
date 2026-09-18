@@ -78,6 +78,8 @@ logs/
 - `LOGS_JSONL_PATH` (`logs/interactions.jsonl`) is relative to CWD — always launch from the project root.
 - `duckdb_executor.py` opens DuckDB in **read-only mode**; any write attempt raises an error at the DB level.
 - The RAG index (`qdrant_storage/`) is a local embedded Qdrant collection built by running `src/rag/ingestion.py` directly (`ingest_corpus()`); it is not rebuilt automatically when `corpus/` changes. Point IDs are deterministic hashes of `filename_chunkindex`, so re-ingestion is idempotent.
+- `qdrant_client.query_points()` is the current API — `.search()` is deprecated as of qdrant-client 1.18 and removed in later versions. `retriever.py` already uses `query_points()`; don't regress to `.search()` when refactoring.
+- On process exit, Python may print `ImportError: sys.meta_path is None` originating from `portalocker` during `QdrantClient` garbage collection. This is cosmetic (an interpreter-shutdown artifact of the local/embedded Qdrant client) — ignore it, it does not indicate a real failure.
 
 ## Database Schema
 
