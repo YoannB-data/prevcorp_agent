@@ -26,6 +26,8 @@ uv run mypy src/                                  # type checking
 
 These are exactly the checks CI (`.github/workflows/ci.yml`) runs on every PR/push to `main`: `ruff format --check`, `ruff check`, `mypy src/`, `pytest tests/`.
 
+Pour générer un document du corpus PrevCorp (Règlement, Notice CCN, Résumé des garanties ou FAQ), décrire en langage naturel le type de document souhaité et le contenu à couvrir : le skill `corpus-generator` (`.claude/skills/corpus-generator/`) se déclenche automatiquement et orchestre la génération, y compris l'appel à `scripts/render.py` en interne.
+
 ## Architecture
 
 ```
@@ -53,7 +55,7 @@ evals/
   rag_questions_draft.yml # Draft corpus of RAG-pipeline eval questions (not yet wired into run_evals.py)
   run_evals.py          # Eval runner: run_evals(), run_single_eval(), write_report()
   reports/               # Timestamped Markdown reports + latest.json (read by sidebar)
-corpus/                # Source PDFs ingested into the RAG index (conditions générales, fiches, FAQ, circulaires)
+corpus/                # Source PDFs ingested into the RAG index (conditions générales, fiches, FAQ, circulaires) — generated via the corpus-generator skill, see .claude/skills/corpus-generator/
 qdrant_storage/        # Local (embedded) Qdrant collection, populated by src/rag/ingestion.py
 logs/
   interactions.jsonl   # Append-only log: question, sql, status, tokens, cost, latency
@@ -80,6 +82,7 @@ logs/
 - The RAG index (`qdrant_storage/`) is a local embedded Qdrant collection built by running `src/rag/ingestion.py` directly (`ingest_corpus()`); it is not rebuilt automatically when `corpus/` changes. Point IDs are deterministic hashes of `filename_chunkindex`, so re-ingestion is idempotent.
 - `qdrant_client.query_points()` is the current API — `.search()` is deprecated as of qdrant-client 1.18 and removed in later versions. `retriever.py` already uses `query_points()`; don't regress to `.search()` when refactoring.
 - On process exit, Python may print `ImportError: sys.meta_path is None` originating from `portalocker` during `QdrantClient` garbage collection. This is cosmetic (an interpreter-shutdown artifact of the local/embedded Qdrant client) — ignore it, it does not indicate a real failure.
+- The `corpus-generator` skill (`.claude/skills/corpus-generator/`) internally calls `scripts/render.py`, which converts HTML to PDF via weasyprint and writes it to `corpus/` as `<TYPE>_<identifiant>.pdf` (prefix mapping in `_TYPE_PREFIXES`). If a generated PDF has an inconsistent name or lands in the wrong place, the bug is most likely in `build_filename()` or in the `corpus_dir` path passed to the script — not in the skill itself.
 
 ## Database Schema
 
