@@ -42,7 +42,11 @@ Prévoyance et Apivia Macif Mutuelle). Structure et vocabulaire uniquement — c
 8. **Annexe I** : tableau des pièces justificatives à fournir par sinistre, colonnes =
    types de prestation (ITT / IPP / DÉCÈS-IAD / RENTE ÉDUCATION / RENTE CONJOINT), valeurs
    oui/non par ligne de justificatif.
-9. Mentions légales assureur en pied de document (forme juridique, capital, RCS, siège).
+
+**Ne pas ajouter de pied de page identifiant l'assureur** (nom de société fictif, forme
+juridique, capital social, numéro RCS, siège social). Ce niveau de détail n'apporte rien à
+l'éval et ajoute du bruit générationnel pour rien — un simple nom de régime ou de garantie
+au fil du texte suffit, sans bloc d'identité corporate en fin de document.
 
 ## Conventions de forme
 

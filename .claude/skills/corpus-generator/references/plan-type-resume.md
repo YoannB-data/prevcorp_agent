@@ -23,8 +23,9 @@ propres à ce contrat, contrairement au Règlement qui est générique.
 3. **Table des cotisations**, séparée de la table des garanties :
    - Lignes = catégorie de personnel (cadre / non cadre).
    - Colonnes = taux de cotisation par tranche.
-4. Mentions légales assureur en pied de page (forme juridique, capital, RCS, siège,
-   mention "document non contractuel à caractère promotionnel" le cas échéant).
+**Ne pas ajouter de pied de page identifiant l'assureur** (nom de société fictif, forme
+juridique, capital social, numéro RCS, siège social, mention "document non contractuel").
+Ce niveau de détail n'apporte rien à l'éval et ajoute du bruit générationnel pour rien.
 
 ## Conventions de forme
 
@@ -34,3 +35,7 @@ propres à ce contrat, contrairement au Règlement qui est générique.
 - Format des tableaux : en-tête de colonne en gras ou fond coloré, une ligne par garantie,
   jamais de fusion de cellules complexe.
 - Ton direct, orienté résultat — moins de prose juridique que la Notice.
+- Paragraphe standard de la section Assistance : citer des exemples de prestations tels que
+  "soutien psychologique", "aide à domicile", "conseil juridique" — **ne jamais mentionner
+  "rapatriement"**, dont l'absence dans tout le corpus PrevCorp est volontaire et vérifiée
+  par l'eval set (RC04).
