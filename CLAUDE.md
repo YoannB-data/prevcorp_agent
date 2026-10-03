@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Python 3.12 (pinned in `.python-version`)
 - **UV** is the package manager — use `uv` commands, not raw `pip`
-- Environment variables loaded from `.env` via python-dotenv; required: `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `MANIFEST_PATH`, `SEMANTIC_MANIFEST_PATH`, `DUCKDB_PATH`
+- Environment variables loaded from `.env` via python-dotenv; required: `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `MANIFEST_PATH`, `SEMANTIC_MANIFEST_PATH`, `DUCKDB_PATH`. Optional: `EDGE_BINARY` (full path to the Edge executable — only needed on machines without GTK3, as the fallback in `scripts/render.py` falls back to `"msedge"` on PATH otherwise, which fails with `FileNotFoundError` if Edge isn't on PATH). `scripts/render.py` calls `load_dotenv()` itself, so `EDGE_BINARY` is picked up from `.env` even when the script is invoked standalone, without relying on a manual export in the calling shell.
 
 ```bash
 uv sync --all-groups                             # install dependencies (incl. dev tools)
@@ -25,6 +25,10 @@ uv run mypy src/                                  # type checking
 ```
 
 These are exactly the checks CI (`.github/workflows/ci.yml`) runs on every PR/push to `main`: `ruff format --check`, `ruff check`, `mypy src/`, `pytest tests/`.
+
+Pour générer un document du corpus PrevCorp (Règlement, Notice CCN, Résumé des garanties ou FAQ), décrire en langage naturel le type de document souhaité et le contenu à couvrir : le skill `corpus-generator` (`.claude/skills/corpus-generator/`) se déclenche automatiquement et orchestre la génération, y compris l'appel à `scripts/render.py` en interne.
+
+`scripts/render.py` utilise weasyprint, qui dépend de bibliothèques système GTK3/Pango non incluses dans le package Python. Sur Windows, cette dépendance native n'est pas installée par défaut et le rendu échoue avec une erreur `libgobject-2.0-0` ; installer le [GTK3 Runtime pour Windows](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer) résout le problème. Sur macOS/Linux, GTK est généralement déjà présent ou s'installe en une commande (`brew install gtk+3` / `apt install libgtk-3-0`).
 
 ## Architecture
 
@@ -53,7 +57,8 @@ evals/
   rag_questions_draft.yml # Draft corpus of RAG-pipeline eval questions (not yet wired into run_evals.py)
   run_evals.py          # Eval runner: run_evals(), run_single_eval(), write_report()
   reports/               # Timestamped Markdown reports + latest.json (read by sidebar)
-corpus/                # Source PDFs ingested into the RAG index (conditions générales, fiches, FAQ, circulaires)
+corpus/                # Generated PDFs (chunked for the RAG index) — gitignored, derivable from corpus_src/*.html via render.py; never the source of truth
+corpus_src/            # HTML source of each corpus document, committed to git — the real content asset (LLM-generated, non-deterministic), since eval questions reference exact values inside it
 qdrant_storage/        # Local (embedded) Qdrant collection, populated by src/rag/ingestion.py
 logs/
   interactions.jsonl   # Append-only log: question, sql, status, tokens, cost, latency
@@ -78,6 +83,10 @@ logs/
 - `LOGS_JSONL_PATH` (`logs/interactions.jsonl`) is relative to CWD — always launch from the project root.
 - `duckdb_executor.py` opens DuckDB in **read-only mode**; any write attempt raises an error at the DB level.
 - The RAG index (`qdrant_storage/`) is a local embedded Qdrant collection built by running `src/rag/ingestion.py` directly (`ingest_corpus()`); it is not rebuilt automatically when `corpus/` changes. Point IDs are deterministic hashes of `filename_chunkindex`, so re-ingestion is idempotent.
+- `qdrant_client.query_points()` is the current API — `.search()` is deprecated as of qdrant-client 1.18 and removed in later versions. `retriever.py` already uses `query_points()`; don't regress to `.search()` when refactoring.
+- On process exit, Python may print `ImportError: sys.meta_path is None` originating from `portalocker` during `QdrantClient` garbage collection. This is cosmetic (an interpreter-shutdown artifact of the local/embedded Qdrant client) — ignore it, it does not indicate a real failure.
+- The `corpus-generator` skill (`.claude/skills/corpus-generator/`) internally calls `scripts/render.py`, which converts HTML to PDF via weasyprint and writes it to `corpus/` as `<TYPE>_<identifiant>.pdf` (prefix mapping in `_TYPE_PREFIXES`). If a generated PDF has an inconsistent name or lands in the wrong place, the bug is most likely in `build_filename()` or in the `corpus_dir` path passed to the script — not in the skill itself.
+- **Standing environment constraint, not a temporary fix**: on this machine, GTK3 cannot be installed, so `render.py` cannot use weasyprint directly — same category of constraint as the Qdrant local-mode decision above (corporate environment limits the ideal setup). `render.py` should detect the missing GTK3 dependency and fall back automatically to a headless-browser print-to-pdf (e.g. `msedge --headless --print-to-pdf=<out>.pdf <in>.html`) rather than relying on manually re-instructing each session to do so. The two engines (WeasyPrint vs. Chromium) don't guarantee identical rendering of table borders, page breaks, or column widths — spot-check a generated PDF visually after implementing the fallback, and note the standing constraint here rather than re-discovering it each session.
 
 ## Database Schema
 
