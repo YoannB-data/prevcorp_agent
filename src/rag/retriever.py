@@ -36,7 +36,7 @@ def retrieve(
                   (conditions_generales, fiche_parametrage, faq, note_technique, circulaire)
 
     Returns:
-        Liste de dicts avec text, source, doc_type, score
+        Liste de dicts avec text, source, doc_id, doc_type, chunk_index, score
     """
     result = voyage_client.embed([question], model=EMBEDDING_MODEL, input_type="query")
     query_vector = [float(x) for x in result.embeddings[0]]
@@ -59,10 +59,14 @@ def retrieve(
     for hit in hits:
         # Guard - with_payload=True garantit un payload non vide pour chaque hit
         assert hit.payload is not None
+        # Guard - une collection ingérée avant le stockage de doc_id fausserait l'éval RAG
+        if "doc_id" not in hit.payload:
+            raise ValueError("chunk sans doc_id : ré-ingérer le corpus (src/rag/ingestion.py)")
         results.append(
             {
                 "text": hit.payload["text"],
                 "source": hit.payload["source"],
+                "doc_id": hit.payload["doc_id"],
                 "doc_type": hit.payload["doc_type"],
                 "chunk_index": hit.payload["chunk_index"],
                 "score": round(hit.score, 4),
