@@ -1,6 +1,7 @@
 """Types partagés du runner d'éval RAG."""
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum, StrEnum
 
 
@@ -91,3 +92,52 @@ class ScoreResult:
     passed: bool
     needs_review: bool
     details: dict[str, bool] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class RetrievedChunk:
+    """Chunk renvoyé par le retrieval, avec l'identité de son document."""
+
+    doc_id: str
+    chunk_index: int
+    score: float
+    text: str
+
+
+@dataclass(frozen=True)
+class RetrievalCheck:
+    """Verdict du retrieval au niveau document ET chunk, avec le détail."""
+
+    ok: bool
+    docs_manquants: list[str]
+    points_absents: list[str]
+
+
+@dataclass
+class QuestionResult:
+    """Résultat complet d'une question : R, E, I, diagnostic et traces."""
+
+    id: str
+    type: str
+    retrieval: RetrievalCheck | None
+    e2e: ScoreResult | None
+    isolated: ScoreResult | None
+    diagnostic: Diagnostic
+    chunks: list[RetrievedChunk] = field(default_factory=list)
+    answer_e2e: str = ""
+    answer_isolated: str = ""
+    error: str | None = None
+
+
+@dataclass
+class Report:
+    """Rapport d'un run : en-tête de reproductibilité et résultats par question."""
+
+    date: datetime
+    yaml_hash: str
+    model: str
+    judge_model: str
+    temperature: float
+    k: int
+    ingestion_variant: str
+    results: list[QuestionResult] = field(default_factory=list)
