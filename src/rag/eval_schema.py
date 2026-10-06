@@ -2,7 +2,7 @@
 
 from collections import Counter
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
@@ -100,7 +100,7 @@ def load_questions(path: Path, valid_doc_ids: set[str]) -> list[RagQuestion]:
 def _check_doc_ids(question: RagQuestion, valid_doc_ids: set[str]) -> None:
     """Vérifie que chaque doc_id référencé existe dans le corpus."""
 
-    refs: list[Any] = [*question.sources_attendues, *(question.contexte_isole or [])]
+    refs: list[str] = [*question.sources_attendues, *(question.contexte_isole or [])]
     inconnus = sorted(set(refs) - valid_doc_ids)
     if inconnus:
         raise ValueError(f"Question {question.id} : doc_id inconnu(s) {inconnus}")
