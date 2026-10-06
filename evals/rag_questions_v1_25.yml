@@ -7,16 +7,6 @@
 #   - RC25 : réponse réécrite (conjoint, puis enfants, puis héritiers ; la Notice s'applique)
 #   - RC08 : rente éducation retirée de la réponse (couverte par RC09)
 #
-# doc_id valides (= stems de corpus_src/*.html) :
-#   REGLEMENT_prevcorp
-#   NOTICE_CCN_metallurgie              (vraie notice)
-#   NOTICE_CCN_metallurgie_distracteur  (piège : ne doit JAMAIS être une source attendue)
-#   NOTICE_CCN_transport_routier
-#   NOTICE_CCN_sante_action_sociale
-#   NOTICE_CCN_agriculture
-#   RESUME_C20077 / RESUME_C39949 / RESUME_C73736 / RESUME_C83792 / RESUME_C87656
-#   FAQ_prevcorp
-#
 # Contrats-ancres partie 1 : C87656 (CADRE, Santé et action sociale) / C83792 (ENSEMBLE DU PERSONNEL, Enseignement privé) / C39949 (NON CADRE, Agriculture)
 # Contrats-ancres partie 2 : C73736 (Métallurgie, CADRE) / C20077 (Transport routier, NON CADRE)
 
@@ -228,11 +218,11 @@ questions:
     corpus_a_contenir: "Réutilise l'écart déjà injecté pour RC03. Notice CCN : confirme l'éligibilité du concubin. Résumé : montant du capital."
 
   - id: RC25
-    question: "Sur le contrat C20077 où le concubin n'est pas reconnu bénéficiaire, que devient le capital décès en son absence de désignation ?"
-    type: croisement
+    question: "Sur le contrat C20077, où le concubin n'est pas reconnu bénéficiaire, à qui est versé le capital décès si aucune désignation n'a été faite ?"
+    type: fait_simple
     contrat_cible: C20077
     reponse_attendue: "La clause bénéficiaire type de la Notice CCN Transport routier s'applique (elle porte les dispositions particulières de la convention, là où le Règlement fixe le socle commun) : le capital est versé au conjoint ou partenaire de PACS de l'assuré ; à défaut, aux enfants par parts égales ; à défaut, aux héritiers. Le concubin n'est pas reconnu par la convention (Annexe II) et n'ouvre aucun droit."
-    sources_attendues: [REGLEMENT_prevcorp, NOTICE_CCN_transport_routier]
+    sources_attendues: [NOTICE_CCN_transport_routier]
     corpus_a_contenir: >
       Notice CCN Transport routier : clause type (conjoint, enfants, héritiers) + Annexe II confirmant la non-reconnaissance du concubin.
       Règlement : clause type du socle commun (avec parents et ascendants) — diffère volontairement de la Notice.

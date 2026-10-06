@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
+from src.rag.metadata import doc_type_from_filename
+
 load_dotenv()
 
 CORPUS_DIR = Path(__file__).parent.parent.parent / "corpus"
@@ -70,22 +72,6 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
 # ─── Métadonnées ─────────────────────────────────────────────────────────────
 
 
-def doc_type_from_filename(filename: str) -> str:
-    """Infère le type de document depuis le nom de fichier."""
-    name = filename.upper()
-    if name.startswith("CG_"):
-        return "conditions_generales"
-    if name.startswith("FICHE_"):
-        return "fiche_parametrage"
-    if name.startswith("FAQ_"):
-        return "faq"
-    if name.startswith("NT_"):
-        return "note_technique"
-    if name.startswith("CIRC_"):
-        return "circulaire"
-    return "autre"
-
-
 def chunk_id(pdf_path: Path, chunk_index: int) -> str:
     """Génère un ID déterministe pour chaque chunk."""
     raw = f"{pdf_path.name}_{chunk_index}"
@@ -120,6 +106,7 @@ def upsert_chunks(chunks: list[str], embeddings: list[list[float]], pdf_path: Pa
                 payload={
                     "text": chunk,
                     "source": pdf_path.name,
+                    "doc_id": pdf_path.stem,
                     "doc_type": doc_type,
                     "chunk_index": i,
                 },
