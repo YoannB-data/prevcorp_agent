@@ -140,12 +140,12 @@ questions:
     corpus_a_contenir: "FAQ : question dédiée sur la franchise avant versement des IJ en maladie ordinaire."
 
   - id: RC16
-    question: "Le jour de carence en congé maladie ordinaire est-il inclus dans le décompte de la franchise de 90 jours ?"
-    type: croisement
+    question: "La franchise de 90 jours est-elle retardée par le jour de carence de la Sécurité sociale ?"
+    type: fait_simple
     contrat_cible: null
-    reponse_attendue: "Non. Le jour de carence de la Sécurité sociale et la franchise contractuelle de 90 jours sont deux notions distinctes : la franchise démarre au premier jour de l'arrêt, que ce jour soit ou non pris en charge par la Sécurité sociale."
-    sources_attendues: [REGLEMENT_prevcorp, FAQ_prevcorp]
-    corpus_a_contenir: "Règlement : définition générale de la franchise. FAQ : précision spécifique sur le traitement du jour de carence dans le décompte."
+    reponse_attendue: "Non. La franchise démarre au premier jour de l'arrêt, que ce jour soit ou non pris en charge par la Sécurité sociale au titre de la carence."
+    sources_attendues: [FAQ_prevcorp]
+    corpus_a_contenir: "FAQ : précision spécifique sur le traitement du jour de carence dans le décompte."
 
   - id: RC17
     question: "Quel est le taux de cotisation salarié pour la garantie rente de conjoint sur le contrat C73736 ?"
