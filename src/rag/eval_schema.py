@@ -73,6 +73,11 @@ class RagQuestion(BaseModel):
         elif not sources:
             raise ValueError(f"{self.type} exige au moins 1 source")
 
+        # chiffre_precis : extraction déterministe uniquement, jamais de juge LLM
+        points = [*self.points_obligatoires, *self.points_interdits]
+        if self.type == "chiffre_precis" and any(p.verif == "juge" for p in points):
+            raise ValueError("chiffre_precis interdit les points verif=juge")
+
         if DISTRACTEUR_ID in sources or DISTRACTEUR_ID in (self.contexte_isole or []):
             raise ValueError(f"{DISTRACTEUR_ID} interdit en source ou contexte_isole")
         doublons = sorted(doc for doc, n in Counter(sources).items() if n > 1)

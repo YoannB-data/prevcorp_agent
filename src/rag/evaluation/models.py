@@ -1,5 +1,6 @@
 """Types partagés du runner d'éval RAG."""
 
+from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 
 
@@ -74,3 +75,19 @@ class Diagnostic(Enum):
         """Piste de correction associée."""
 
         return self.value[2]
+
+
+@dataclass(frozen=True)
+class Answer:
+    """Réponse générée par le modèle."""
+
+    text: str
+
+
+@dataclass(frozen=True)
+class ScoreResult:
+    """Résultat d'un scorer : verdict, besoin de relecture manuelle et détail par point."""
+
+    passed: bool
+    needs_review: bool
+    details: dict[str, bool] = field(default_factory=dict)
