@@ -47,3 +47,7 @@ per-file-ignores = { "evals/*.py" = ["E402"], "src/app.py" = ["E402"], "corpus/*
 python_version = "3.12"
 ignore_missing_imports = true
 disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
