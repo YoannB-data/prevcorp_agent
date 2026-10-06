@@ -27,6 +27,9 @@ def _q(**overrides):
         "reponse_attendue": "90 jours",
         "sources_attendues": ["RESUME_C87656"],
         "corpus_a_contenir": "franchise ITT",
+        "points_obligatoires": [
+            {"id": "O0", "texte": "90 jours", "formes": ["90 jours"], "verif": "deterministe"}
+        ],
     }
     base.update(overrides)
     return base
@@ -174,9 +177,9 @@ def test_points_valides(tmp_path):
     assert q.points_interdits[0].verif == "juge"
 
 
-def test_points_absents_par_defaut(tmp_path):
+def test_points_interdits_vides_par_defaut(tmp_path):
     (q,) = _load(tmp_path, _q())
-    assert q.points_obligatoires == [] and q.points_interdits == []
+    assert q.points_interdits == []
 
 
 def test_point_sans_formes(tmp_path):
@@ -192,3 +195,8 @@ def test_point_verif_inconnue(tmp_path):
 def test_ids_de_points_dupliques(tmp_path):
     with pytest.raises(ValueError, match="RC01.*ids de points dupliqués"):
         _load(tmp_path, _q(points_obligatoires=[_point("P1")], points_interdits=[_point("P1")]))
+
+
+def test_points_obligatoires_vide(tmp_path):
+    with pytest.raises(ValueError, match="RC01.*points_obligatoires vide"):
+        _load(tmp_path, _q(points_obligatoires=[]))

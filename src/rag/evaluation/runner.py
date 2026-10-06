@@ -87,10 +87,6 @@ def run_eval(
     """Rejoue les questions du YAML et rassemble les résultats dans un rapport."""
 
     questions = load_questions(yaml_path, valid_doc_ids)
-    non_scorables = [q.id for q in questions if not q.points_obligatoires]
-    # Guard - échoue avant tout appel payant si des questions ne sont pas scorables
-    if non_scorables:
-        raise ValueError(f"points_obligatoires vide pour : {non_scorables}")
     if ids:
         questions = [q for q in questions if q.id in ids]
 

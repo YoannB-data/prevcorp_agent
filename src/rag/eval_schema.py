@@ -73,6 +73,8 @@ class RagQuestion(BaseModel):
         elif not sources:
             raise ValueError(f"{self.type} exige au moins 1 source")
 
+        if not self.points_obligatoires:
+            raise ValueError("points_obligatoires vide : question non scorable")
         # chiffre_precis : extraction déterministe uniquement, jamais de juge LLM
         points = [*self.points_obligatoires, *self.points_interdits]
         if self.type == "chiffre_precis" and any(p.verif == "juge" for p in points):

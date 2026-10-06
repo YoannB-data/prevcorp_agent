@@ -71,7 +71,9 @@ def test_une_forme_suffit_parmi_les_formes_acceptables():
 
 
 def test_aucun_point_obligatoire_leve():
-    q = _question([])
+    q = _question([["60 jours"]])
+    # le schéma l'interdit : on contourne la validation pour tester la garde du scorer
+    q.points_obligatoires = []
     with pytest.raises(ValueError, match="non scorable"):
         score(q, Answer("60 jours"))
 

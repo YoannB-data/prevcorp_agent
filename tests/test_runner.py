@@ -150,7 +150,7 @@ def test_alerte_sans_reponse_quand_le_retrieval_ramene_un_chunk_tentant(tmp_path
 def test_fail_fast_si_points_obligatoires_manquants(tmp_path):
     data = _questions()
     data["questions"][0]["points_obligatoires"] = []
-    with pytest.raises(ValueError, match=r"points_obligatoires vide pour : \['RC01'\]"):
+    with pytest.raises(ValueError, match="RC01.*points_obligatoires vide"):
         _run(tmp_path, data)
 
 

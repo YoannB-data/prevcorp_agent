@@ -44,6 +44,7 @@ def test_evaluate_appelle_l_api_a_temperature_zero():
             "reponse_attendue": "r",
             "sources_attendues": ["FAQ_prevcorp"],
             "corpus_a_contenir": "c",
+            "points_obligatoires": [POINTS[0].model_dump()],
         }
     )
     judge = AnthropicJudge(client, "modele-test")  # type: ignore[arg-type]
