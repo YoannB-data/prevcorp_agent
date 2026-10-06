@@ -102,6 +102,8 @@ class RetrievedChunk:
     chunk_index: int
     score: float
     text: str
+    # nom de fichier du PDF, repris dans le prompt de génération comme en production
+    source: str = ""
 
 
 @dataclass(frozen=True)

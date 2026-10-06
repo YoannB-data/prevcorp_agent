@@ -26,9 +26,9 @@ def format_context(chunks: list[dict]) -> str:
     """Formate les chunks en bloc de contexte pour le prompt."""
     blocks = []
     for i, chunk in enumerate(chunks, 1):
-        blocks.append(
-            f"[Extrait {i} — {chunk['source']} | score={chunk['score']}]\n{chunk['text']}"
-        )
+        # le contexte isolé de l'éval n'a pas de score de similarité
+        score = f" | score={chunk['score']}" if "score" in chunk else ""
+        blocks.append(f"[Extrait {i} — {chunk['source']}{score}]\n{chunk['text']}")
     return "\n\n---\n\n".join(blocks)
 
 
