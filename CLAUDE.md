@@ -54,7 +54,8 @@ src/
     few_shot_bank.yml  # Few-shot examples pool (question + sql + keywords)
 evals/
   eval_set.yml         # Evaluation questions with reference SQL and compare modes (SQL pipeline)
-  rag_questions_draft.yml # Draft corpus of RAG-pipeline eval questions (not yet wired into run_evals.py)
+  rag_questions_v1_25.yml # 25 RAG eval questions (YAML v1), validated by src/rag/eval_schema.py
+  run_rag_evals.py      # RAG eval runner CLI (R/E/I cube), reports in evals/reports/rag/
   run_evals.py          # Eval runner: run_evals(), run_single_eval(), write_report()
   reports/               # Timestamped Markdown reports + latest.json (read by sidebar)
 corpus/                # Generated PDFs (chunked for the RAG index) — gitignored, derivable from corpus_src/*.html via render.py; never the source of truth
@@ -67,7 +68,7 @@ logs/
 **Request flow**: `orchestrator_main(question)` (`src/orchestrator.py`) → `router.route()` classifies the question via a dedicated Claude call (`sql` or `rag`) → dispatches to one of two independent pipelines, returned as a unified `OrchestratorResult`:
 
 - **SQL pipeline** (`src/structured/sql_agent.py`): `agent_main(question)` builds a message with few-shot examples + schema + semantic layer → `_call_llm_with_retry()` → `_extract_sql()` → `execute_query()`. On SQL error: appends error + attempted SQL to the message and retries (up to `_MAX_RETRIES=3`). Logs every attempt (success or error) to JSONL. Returns `(sql_str, pd.DataFrame)`.
-- **RAG pipeline** (`src/rag/generator.py`): `generate(question)` → `retriever.retrieve()` embeds the question with Voyage and queries Qdrant for top-k chunks (optionally filtered by `doc_type`) → chunks are formatted into context and sent to Claude with a citation-enforcing system prompt → returns `{question, answer, sources, chunks}`. The RAG pipeline has no eval harness or retry loop yet.
+- **RAG pipeline** (`src/rag/generator.py`): `generate(question)` → `retriever.retrieve()` embeds the question with Voyage and queries Qdrant for top-k chunks (optionally filtered by `doc_type`) → chunks are formatted into context and sent to Claude with a citation-enforcing system prompt → returns `{question, answer, sources, chunks}`. The RAG pipeline has no retry loop; its eval harness is `evals/run_rag_evals.py` (see RAG Evaluation).
 
 **Two distinct retry loops in the SQL pipeline** (do not confuse them):
 - **Outer loop** in `agent_main` (up to `_MAX_RETRIES=3`): SQL correction — on `execute_query()` failure, the error + attempted SQL are appended to the message and Claude is called again.
@@ -110,7 +111,15 @@ After a full run, `evals/reports/latest.json` is updated with `score_pct`, `pass
 
 Run evals after significant changes to `src/structured/sql_agent.py`, `src/structured/schema_loader.py`, or `src/prompts/system_prompt.md`.
 
-`evals/rag_questions_draft.yml` is a draft question bank for the RAG pipeline; there is no runner wired up for it yet.
+
+## RAG Evaluation
+
+`uv run python evals/run_rag_evals.py [--k 5] [--variant none] [--ids RC01 ...]` rejoue les questions de `evals/rag_questions_v1_25.yml` (package `src/rag/evaluation/`). Chaque question est évaluée trois fois : retrieval (R, au niveau chunk : sources attendues dans le top-k ET formes des `points_obligatoires` dans un chunk d'une source attendue), end-to-end (E) et génération isolée (I, contexte = document entier de `contexte_effectif`). `diagnose()` croise R/E/I (`sans_reponse` : R = N/A). Rapport par run dans `evals/reports/rag/` (committé), un fichier nommé date + variante + hash du YAML.
+
+- Points `deterministe` : extraction par regex (`numbers.py`), jamais de LLM ni d'embeddings ; `chiffre_precis` interdit `verif: juge`. Points `juge` : un LLM coche oui/non, résultat « à vérifier à la main ». Les questions « écart » (valeurs à rattacher au bon document) passent par le juge : la présence de valeurs ne détecte pas une inversion.
+- `ingestion_variant` est un label déclaré, non vérifié : l'ingestion n'a pas encore de variantes.
+- **Écart de température éval/prod** : l'éval force `temperature=0` (`generate_from_chunks(..., temperature=0.0)`), alors que `generator.generate()` en prod garde le défaut de l'API (1.0). Les scores d'éval ne mesurent donc pas exactement le comportement de l'app.
+- Le runner ouvre Qdrant local (verrou disque) : ne pas le lancer pendant que Streamlit tourne. Les appels réels (Voyage, Anthropic) coûtent : ne les lancer qu'à dessein.
 
 ## Tests
 
