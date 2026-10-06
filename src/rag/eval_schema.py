@@ -25,6 +25,12 @@ class RagQuestion(BaseModel):
     contexte_isole: list[str] | None = None
     corpus_a_contenir: str
 
+    @property
+    def contexte_effectif(self) -> list[str]:
+        """Contexte du run isolé : contexte_isole, à défaut sources_attendues."""
+
+        return self.contexte_isole if self.contexte_isole is not None else self.sources_attendues
+
     @field_validator("question", "reponse_attendue", "corpus_a_contenir")
     @classmethod
     def _non_vide(cls, value: str) -> str:

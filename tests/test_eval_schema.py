@@ -138,3 +138,15 @@ def test_fichier_reel_respecte_le_contrat():
     valid = {p.stem for p in pdfs}
     questions = load_questions(ROOT / "evals" / "rag_questions_v1_25.yml", valid)
     assert len(questions) == 25
+
+
+def test_contexte_effectif_defaut_sur_sources(tmp_path):
+    (q,) = _load(tmp_path, _q())
+    assert q.contexte_effectif == q.sources_attendues == ["RESUME_C87656"]
+
+
+def test_contexte_effectif_utilise_contexte_isole(tmp_path):
+    (q,) = _load(
+        tmp_path, _q(type="sans_reponse", sources_attendues=[], contexte_isole=["RESUME_C87656"])
+    )
+    assert q.contexte_effectif == ["RESUME_C87656"]
