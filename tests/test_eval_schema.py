@@ -150,3 +150,45 @@ def test_contexte_effectif_utilise_contexte_isole(tmp_path):
         tmp_path, _q(type="sans_reponse", sources_attendues=[], contexte_isole=["RESUME_C87656"])
     )
     assert q.contexte_effectif == ["RESUME_C87656"]
+
+
+def _point(pid="P1", **overrides):
+    """Construit un point valide, avec surcharges."""
+
+    base = {
+        "id": pid,
+        "texte": "Franchise de 90 jours",
+        "formes": ["90 jours"],
+        "verif": "deterministe",
+    }
+    base.update(overrides)
+    return base
+
+
+def test_points_valides(tmp_path):
+    (q,) = _load(
+        tmp_path,
+        _q(points_obligatoires=[_point()], points_interdits=[_point("X1", verif="juge")]),
+    )
+    assert q.points_obligatoires[0].formes == ["90 jours"]
+    assert q.points_interdits[0].verif == "juge"
+
+
+def test_points_absents_par_defaut(tmp_path):
+    (q,) = _load(tmp_path, _q())
+    assert q.points_obligatoires == [] and q.points_interdits == []
+
+
+def test_point_sans_formes(tmp_path):
+    with pytest.raises(ValueError, match="RC01.*formes"):
+        _load(tmp_path, _q(points_obligatoires=[_point(formes=[])]))
+
+
+def test_point_verif_inconnue(tmp_path):
+    with pytest.raises(ValueError, match="RC01.*verif"):
+        _load(tmp_path, _q(points_obligatoires=[_point(verif="humain")]))
+
+
+def test_ids_de_points_dupliques(tmp_path):
+    with pytest.raises(ValueError, match="RC01.*ids de points dupliqués"):
+        _load(tmp_path, _q(points_obligatoires=[_point("P1")], points_interdits=[_point("P1")]))
