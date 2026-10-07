@@ -12,3 +12,4 @@ evals/reports/*
 logs/
 .env
 sandbox.*
+evals/tmp/
