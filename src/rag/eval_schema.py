@@ -11,6 +11,18 @@ DISTRACTEUR_ID = "NOTICE_CCN_metallurgie_distracteur"
 ID_PATTERN = r"^RC\d{2}$"
 
 
+class Point(BaseModel):
+    """Proposition atomique vérifiable d'une réponse, avec ses formes acceptables."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    texte: str
+    formes: list[str] = Field(min_length=1)
+    # verif décide qui note la réponse ; formes sert aussi au contrôle de présence du retrieval
+    verif: Literal["deterministe", "juge"]
+
+
 class RagQuestion(BaseModel):
     """Une question d'éval RAG et son contrat de données."""
 
@@ -24,6 +36,8 @@ class RagQuestion(BaseModel):
     sources_attendues: list[str]
     contexte_isole: list[str] | None = None
     corpus_a_contenir: str
+    points_obligatoires: list[Point] = Field(default_factory=list)
+    points_interdits: list[Point] = Field(default_factory=list)
 
     @property
     def contexte_effectif(self) -> list[str]:
@@ -59,11 +73,22 @@ class RagQuestion(BaseModel):
         elif not sources:
             raise ValueError(f"{self.type} exige au moins 1 source")
 
+        if not self.points_obligatoires:
+            raise ValueError("points_obligatoires vide : question non scorable")
+        # chiffre_precis : extraction déterministe uniquement, jamais de juge LLM
+        points = [*self.points_obligatoires, *self.points_interdits]
+        if self.type == "chiffre_precis" and any(p.verif == "juge" for p in points):
+            raise ValueError("chiffre_precis interdit les points verif=juge")
+
         if DISTRACTEUR_ID in sources or DISTRACTEUR_ID in (self.contexte_isole or []):
             raise ValueError(f"{DISTRACTEUR_ID} interdit en source ou contexte_isole")
         doublons = sorted(doc for doc, n in Counter(sources).items() if n > 1)
         if doublons:
             raise ValueError(f"doublons dans sources_attendues : {doublons}")
+        point_ids = [p.id for p in (*self.points_obligatoires, *self.points_interdits)]
+        doublons_points = sorted(pid for pid, n in Counter(point_ids).items() if n > 1)
+        if doublons_points:
+            raise ValueError(f"ids de points dupliqués : {doublons_points}")
         return self
 
 

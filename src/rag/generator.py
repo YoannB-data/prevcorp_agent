@@ -26,20 +26,17 @@ def format_context(chunks: list[dict]) -> str:
     """Formate les chunks en bloc de contexte pour le prompt."""
     blocks = []
     for i, chunk in enumerate(chunks, 1):
-        blocks.append(
-            f"[Extrait {i} — {chunk['source']} | score={chunk['score']}]\n{chunk['text']}"
-        )
+        # le contexte isolé de l'éval n'a pas de score de similarité
+        score = f" | score={chunk['score']}" if "score" in chunk else ""
+        blocks.append(f"[Extrait {i} — {chunk['source']}{score}]\n{chunk['text']}")
     return "\n\n---\n\n".join(blocks)
 
 
-def generate(question: str, top_k: int = 5, doc_type: str | None = None) -> dict:
-    """
-    Génère une réponse augmentée pour une question.
+def generate_from_chunks(
+    question: str, chunks: list[dict], temperature: float | None = None
+) -> str:
+    """Génère la réponse à partir de chunks déjà récupérés ; temperature None = défaut de l'API."""
 
-    Returns:
-        dict avec question, answer, sources, chunks
-    """
-    chunks = retrieve(question, top_k=top_k, doc_type=doc_type)
     context = format_context(chunks)
 
     user_message = f"""Extraits de documents PrevCorp :
@@ -50,16 +47,29 @@ def generate(question: str, top_k: int = 5, doc_type: str | None = None) -> dict
 
 Question : {question}"""
 
+    # Le défaut de l'API n'est pas 0 : l'éval fixe temperature=0, la prod garde le défaut
     response = client.messages.create(
         model=MODEL,
         max_tokens=MAX_TOKENS,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_message}],
+        temperature=anthropic.omit if temperature is None else temperature,
     )
 
     text_block = response.content[0]
     assert isinstance(text_block, anthropic.types.TextBlock)
-    answer = text_block.text
+    return text_block.text
+
+
+def generate(question: str, top_k: int = 5, doc_type: str | None = None) -> dict:
+    """
+    Génère une réponse augmentée pour une question.
+
+    Returns:
+        dict avec question, answer, sources, chunks
+    """
+    chunks = retrieve(question, top_k=top_k, doc_type=doc_type)
+    answer = generate_from_chunks(question, chunks)
     sources = list({chunk["source"] for chunk in chunks})
 
     return {
