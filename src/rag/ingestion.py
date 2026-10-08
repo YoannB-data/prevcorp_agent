@@ -2,6 +2,7 @@
 Pipeline d'ingestion : PDF → texte → chunks → embeddings Voyage → Qdrant
 """
 
+import argparse
 import hashlib
 import os
 from collections import defaultdict
@@ -186,5 +187,27 @@ def ingest_corpus(
     return total
 
 
+def recreate_collection(qdrant: QdrantClient) -> None:
+    """Supprime la collection si elle existe, pour repartir d'un index vide."""
+
+    if COLLECTION_NAME in [c.name for c in qdrant.get_collections().collections]:
+        qdrant.delete_collection(COLLECTION_NAME)
+        print(f"Collection '{COLLECTION_NAME}' supprimée.")
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Point d'entrée CLI : --variant choisit l'embedding, --recreate vide l'index avant."""
+
+    parser = argparse.ArgumentParser(description="Ingestion du corpus PrevCorp dans Qdrant")
+    parser.add_argument("--variant", choices=["none", "prefix"], default="none")
+    parser.add_argument("--recreate", action="store_true", help="supprime la collection avant")
+    args = parser.parse_args(argv)
+    clients = default_clients()
+    if args.recreate:
+        recreate_collection(clients[1])
+    ingest_corpus(variant=args.variant, clients=clients)
+    return 0
+
+
 if __name__ == "__main__":
-    ingest_corpus()
+    raise SystemExit(main())
