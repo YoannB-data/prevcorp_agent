@@ -165,7 +165,10 @@ Exemples de bons découpages :
 Format des messages : `type(scope): description courte`
 Types courants : `feat`, `fix`, `refactor`, `docs`, `chore`
 
-**Ne jamais commiter avec une adresse e-mail professionnelle** (repo public, zéro lien avec l'employeur) : utiliser l'adresse noreply GitHub (`git config user.email`).
+- Adresse e-mail Git : tous les **nouveaux commits** utilisent l'adresse noreply GitHub
+  (`git config user.email` à vérifier avant tout commit). L'historique antérieur de `dev`
+  contient des commits avec une adresse professionnelle ; c'est une décision assumée,
+  ne pas réécrire l'historique.
 
 ## Code Style
 
