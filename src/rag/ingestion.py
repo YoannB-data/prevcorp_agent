@@ -4,15 +4,22 @@ Pipeline d'ingestion : PDF → texte → chunks → embeddings Voyage → Qdrant
 
 import hashlib
 import os
+from collections import defaultdict
 from pathlib import Path
+from typing import Literal
 
-import pdfplumber
 import voyageai
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
-from src.rag.metadata import doc_type_from_filename
+from src.rag.metadata import (
+    build_context_prefix,
+    doc_type_from_filename,
+    extract_contract_info,
+    extract_title,
+)
+from src.rag.pdf_text import extract_text
 
 load_dotenv()
 
@@ -23,34 +30,13 @@ EMBEDDING_MODEL = "voyage-multilingual-2"
 CHUNK_SIZE = 150
 CHUNK_OVERLAP = 20
 
-voyage_client = voyageai.Client(api_key=os.getenv("VOYAGE_API_KEY"))
-qdrant_client = QdrantClient(path=str(QDRANT_PATH))
+Variant = Literal["none", "prefix"]
 
 
-# ─── Extraction texte ────────────────────────────────────────────────────────
+def default_clients() -> tuple[voyageai.Client, QdrantClient]:
+    """Ouvre Voyage et Qdrant local (verrou disque) ; appelé à l'exécution, pas à l'import."""
 
-
-def extract_text(pdf_path: Path) -> str:
-    """Extrait texte + tableaux d'un PDF, en traitant les tableaux séparément."""
-    pages_text = []
-    with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages:
-            blocks = []
-            # Tableaux
-            for table in page.extract_tables():
-                if not table:
-                    continue
-                header = table[0]
-                rows = table[1:]
-                table_lines = [" | ".join(str(c) for c in header)]
-                table_lines += [" | ".join(str(c) for c in row) for row in rows]
-                blocks.append("\n".join(table_lines))
-            # Texte hors tableaux
-            text = page.extract_text()
-            if text:
-                blocks.append(text.strip())
-            pages_text.append("\n\n".join(blocks))
-    return "\n\n".join(pages_text)
+    return voyageai.Client(api_key=os.getenv("VOYAGE_API_KEY")), QdrantClient(path=str(QDRANT_PATH))
 
 
 # ─── Chunking ────────────────────────────────────────────────────────────────
@@ -81,11 +67,12 @@ def chunk_id(pdf_path: Path, chunk_index: int) -> str:
 # ─── Qdrant ──────────────────────────────────────────────────────────────────
 
 
-def ensure_collection() -> None:
+def ensure_collection(qdrant: QdrantClient) -> None:
     """Crée la collection Qdrant si elle n'existe pas."""
-    existing = [c.name for c in qdrant_client.get_collections().collections]
+
+    existing = [c.name for c in qdrant.get_collections().collections]
     if COLLECTION_NAME not in existing:
-        qdrant_client.create_collection(
+        qdrant.create_collection(
             collection_name=COLLECTION_NAME,
             vectors_config=VectorParams(size=1024, distance=Distance.COSINE),
         )
@@ -94,8 +81,15 @@ def ensure_collection() -> None:
         print(f"Collection '{COLLECTION_NAME}' existante — on continue.")
 
 
-def upsert_chunks(chunks: list[str], embeddings: list[list[float]], pdf_path: Path) -> None:
-    """Insère les chunks + embeddings + métadonnées dans Qdrant."""
+def upsert_chunks(
+    qdrant: QdrantClient,
+    chunks: list[str],
+    embeddings: list[list[float]],
+    pdf_path: Path,
+    variant: Variant,
+) -> None:
+    """Insère les chunks bruts + embeddings + métadonnées dans Qdrant."""
+
     doc_type = doc_type_from_filename(pdf_path.name)
     points = []
     for i, (chunk, vector) in enumerate(zip(chunks, embeddings)):
@@ -109,42 +103,87 @@ def upsert_chunks(chunks: list[str], embeddings: list[list[float]], pdf_path: Pa
                     "doc_id": pdf_path.stem,
                     "doc_type": doc_type,
                     "chunk_index": i,
+                    # Lu par l'éval pour refuser un label qui ne correspond pas à l'index
+                    "ingestion_variant": variant,
                 },
             )
         )
-    qdrant_client.upsert(collection_name=COLLECTION_NAME, points=points)
+    qdrant.upsert(collection_name=COLLECTION_NAME, points=points)
+
+
+# ─── Préfixe de contexte ─────────────────────────────────────────────────────
+
+
+def embedding_text(chunk: str, prefix: str) -> str:
+    """Texte envoyé à l'embedding : préfixe, saut de ligne, chunk brut."""
+
+    return f"{prefix}\n{chunk}"
+
+
+def document_prefix(text: str, pdf_path: Path) -> str:
+    """Préfixe de contexte d'un document ; lève PrefixConstructionError plutôt que de dégrader."""
+
+    doc_type = doc_type_from_filename(pdf_path.name)
+    if doc_type == "resume_contrat":
+        contract = extract_contract_info(text, pdf_path.name)
+        return build_context_prefix("", doc_type, contract)
+    return build_context_prefix(extract_title(text, pdf_path.name), doc_type, None)
 
 
 # ─── Pipeline principal ───────────────────────────────────────────────────────
 
 
-def ingest_pdf(pdf_path: Path) -> int:
-    """Ingère un seul PDF. Retourne le nombre de chunks insérés."""
+def ingest_pdf(
+    pdf_path: Path,
+    voyage: voyageai.Client,
+    qdrant: QdrantClient,
+    variant: Variant = "none",
+) -> tuple[int, int]:
+    """Ingère un seul PDF. Retourne (chunks insérés, chunks dont l'embedding est préfixé)."""
+
     text = extract_text(pdf_path)
     if not text.strip():
         print(f"  ⚠ Texte vide : {pdf_path.name}")
-        return 0
+        return 0, 0
     chunks = chunk_text(text)
-    result = voyage_client.embed(chunks, model=EMBEDDING_MODEL, input_type="document")
+    if variant == "prefix":
+        prefix = document_prefix(text, pdf_path)
+        embedded = [embedding_text(c, prefix) for c in chunks]
+    else:
+        embedded = chunks
+    result = voyage.embed(embedded, model=EMBEDDING_MODEL, input_type="document")
     embeddings = [[float(x) for x in vector] for vector in result.embeddings]
-    upsert_chunks(chunks, embeddings, pdf_path)
-    return len(chunks)
+    upsert_chunks(qdrant, chunks, embeddings, pdf_path, variant)
+    return len(chunks), len(chunks) if variant == "prefix" else 0
 
 
-def ingest_corpus(corpus_dir: Path = CORPUS_DIR) -> None:
-    """Ingère tous les PDFs du corpus."""
-    ensure_collection()
+def ingest_corpus(
+    corpus_dir: Path = CORPUS_DIR,
+    variant: Variant = "none",
+    clients: tuple[voyageai.Client, QdrantClient] | None = None,
+) -> int:
+    """Ingère tous les PDFs du corpus et affiche les chunks préfixés par type. Retourne le total."""
+
+    voyage, qdrant = clients or default_clients()
+    ensure_collection(qdrant)
     pdfs = sorted(corpus_dir.glob("*.pdf"))
     if not pdfs:
         print(f"Aucun PDF trouvé dans {corpus_dir}")
-        return
-    print(f"\n{len(pdfs)} PDFs à ingérer...\n")
-    total_chunks = 0
+        return 0
+    print(f"\n{len(pdfs)} PDFs à ingérer (variante : {variant})...\n")
+    per_type: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     for pdf_path in pdfs:
-        n = ingest_pdf(pdf_path)
-        total_chunks += n
+        n, n_prefixed = ingest_pdf(pdf_path, voyage, qdrant, variant)
+        stats = per_type[doc_type_from_filename(pdf_path.name)]
+        stats[0] += n
+        stats[1] += n_prefixed
         print(f"  ✓ {pdf_path.name} — {n} chunks")
-    print(f"\n✅ Ingestion terminée : {total_chunks} chunks dans Qdrant")
+    print("\nChunks préfixés / chunks, par type de document :")
+    for doc_type, (n, n_prefixed) in sorted(per_type.items()):
+        print(f"  {doc_type}: {n_prefixed}/{n}")
+    total = sum(n for n, _ in per_type.values())
+    print(f"\n✅ Ingestion terminée : {total} chunks dans Qdrant")
+    return total
 
 
 if __name__ == "__main__":
