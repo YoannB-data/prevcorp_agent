@@ -77,7 +77,7 @@ def render_header(report: Report) -> str:
             f"- Modèle du juge : {report.judge_model}",
             f"- Temperature : {report.temperature}",
             f"- k : {report.k}",
-            f"- Variante d'ingestion : {report.ingestion_variant} (déclarée, non vérifiée)",
+            f"- Variante d'ingestion : {report.ingestion_variant} (vérifiée contre la collection)",
             f"- Contexte isolé : {CONTEXTE_ISOLE}",
             "",
         ]
@@ -130,12 +130,22 @@ def _render_chunks(result: QuestionResult) -> list[str]:
     return lines
 
 
+def _render_answers(result: QuestionResult) -> list[str]:
+    """Blocs « Réponse e2e » et « Réponse isolée », en citation pour isoler le markdown généré."""
+
+    lines: list[str] = []
+    for label, answer in (("e2e", result.answer_e2e), ("isolée", result.answer_isolated)):
+        corps = answer.strip() or "(aucune)"
+        lines += [f"**Réponse {label}**", "", *(f"> {ligne}" for ligne in corps.splitlines()), ""]
+    return lines
+
+
 def render_question(result: QuestionResult) -> str:
-    """Section d'une question : R, E, I, diagnostic, détail et chunks e2e."""
+    """Section d'une question : R, E, I, diagnostic, réponses, détail et chunks e2e."""
 
     lines = [f"### {result.id} ({result.type})", ""]
     if result.error is not None:
-        lines += [f"- **ERREUR d'I/O** : {result.error}", ""]
+        lines += [f"- **ERREUR d'I/O** : {result.error}", "", *_render_answers(result)]
         return "\n".join(lines)
     if result.retrieval is None:
         retrieval = "N/A"
@@ -152,6 +162,7 @@ def render_question(result: QuestionResult) -> str:
         f"- diagnostic : {result.diagnostic.libelle} ({result.diagnostic.famille.value})"
         f" — à corriger : {result.diagnostic.correction}",
         "",
+        *_render_answers(result),
     ]
     for label, score in (("e2e", result.e2e), ("isolé", result.isolated)):
         if score is not None and not score.passed:

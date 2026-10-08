@@ -127,7 +127,7 @@ Run evals after significant changes to `src/structured/sql_agent.py`, `src/struc
 - Points `deterministe` : extraction par regex (`numbers.py`), jamais de LLM ni d'embeddings ; `chiffre_precis` interdit `verif: juge`. Points `juge` : un LLM coche oui/non, résultat « à vérifier à la main ». Les questions « écart » (valeurs à rattacher au bon document) passent par le juge : la présence de valeurs ne détecte pas une inversion.
 - `points_interdits` est exclu du contrôle de présence dans les chunks : ce sont des formulations de mauvaise source, leur absence des chunks attendus est normale.
 - Limite connue (RC08) : les valeurs sont vérifiées par présence, sans rattachement à leur source, car `chiffre_precis` interdit le juge.
-- `ingestion_variant` est un label déclaré, non vérifié : l'ingestion n'a pas encore de variantes.
+- `ingestion_variant` (`none`/`prefix`) est enregistré dans le payload de chaque chunk par `python -m src.rag.ingestion --variant ... [--recreate]` ; le runner refuse de tourner (code 2) si `--variant` ne correspond pas à la collection.
 - **Écart de température éval/prod** : l'éval force `temperature=0` (`generate_from_chunks(..., temperature=0.0)`), alors que `generator.generate()` en prod garde le défaut de l'API (1.0). Les scores d'éval ne mesurent donc pas exactement le comportement de l'app.
 - Le runner ouvre Qdrant local (verrou disque) : ne pas le lancer pendant que Streamlit tourne. Les appels réels (Voyage, Anthropic) coûtent : ne les lancer qu'à dessein.
 - `inspect_chunks.py` est un script de debug local, dans `.gitignore`.
@@ -165,7 +165,10 @@ Exemples de bons découpages :
 Format des messages : `type(scope): description courte`
 Types courants : `feat`, `fix`, `refactor`, `docs`, `chore`
 
-**Ne jamais commiter avec une adresse e-mail professionnelle** (repo public, zéro lien avec l'employeur) : utiliser l'adresse noreply GitHub (`git config user.email`).
+- Adresse e-mail Git : tous les **nouveaux commits** utilisent l'adresse noreply GitHub
+  (`git config user.email` à vérifier avant tout commit). L'historique antérieur de `dev`
+  contient des commits avec une adresse professionnelle ; c'est une décision assumée,
+  ne pas réécrire l'historique.
 
 ## Code Style
 
