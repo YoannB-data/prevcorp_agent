@@ -59,7 +59,7 @@ def test_entete_contient_les_champs_de_reproductibilite():
         "claude-sonnet-4-6",
         "Temperature : 0.0",
         "k : 5",
-        "Variante d'ingestion : none (déclarée, non vérifiée)",
+        "Variante d'ingestion : none (vérifiée contre la collection)",
         "Contexte isolé : document entier",
     ):
         assert attendu in entete
