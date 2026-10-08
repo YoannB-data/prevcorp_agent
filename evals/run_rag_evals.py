@@ -24,16 +24,22 @@ def main() -> int:
         "--variant",
         choices=["none", "prefix", "contextual"],
         default="none",
-        help="variante d'ingestion, déclarée et non vérifiée",
+        help="variante d'ingestion attendue, vérifiée contre la collection",
     )
     parser.add_argument("--judge-model", default=None, help="modèle du juge (défaut : MODEL)")
     parser.add_argument("--ids", nargs="*", metavar="ID", help="IDs à évaluer (ex: RC01 RC17)")
     args = parser.parse_args()
 
     # import paresseux : ouvre Voyage et Qdrant local (verrou disque)
-    from src.rag.evaluation.adapters import TEMPERATURE, build_deps
+    from src.rag.evaluation.adapters import TEMPERATURE, build_deps, check_variant
 
-    deps = build_deps(args.judge_model)
+    try:
+        deps = build_deps(args.judge_model)
+        check_variant(args.variant, deps.collection_variant)
+    except ValueError as exc:
+        # Guard - un label de variante faux produirait un rapport trompeur
+        print(f"Éval annulée : {exc}", file=sys.stderr)
+        return 2
     report = run_eval(
         args.yaml,
         args.k,

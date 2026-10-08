@@ -77,7 +77,7 @@ def render_header(report: Report) -> str:
             f"- Modèle du juge : {report.judge_model}",
             f"- Temperature : {report.temperature}",
             f"- k : {report.k}",
-            f"- Variante d'ingestion : {report.ingestion_variant} (déclarée, non vérifiée)",
+            f"- Variante d'ingestion : {report.ingestion_variant} (vérifiée contre la collection)",
             f"- Contexte isolé : {CONTEXTE_ISOLE}",
             "",
         ]
