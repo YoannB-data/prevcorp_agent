@@ -138,6 +138,10 @@ Run evals after significant changes to `src/structured/sql_agent.py`, `src/struc
 
 `mypy` ne vérifie que `src/` : `tests/` est hors périmètre CI, et `disallow_untyped_defs` y est relâché (override dans `pyproject.toml`).
 
+## Hook PostToolUse
+
+`.claude/hooks/check_python.py` (déclaré dans `.claude/settings.json`, matcher `Edit|Write`) lance `ruff check` sur tout `.py` écrit ou édité, puis `mypy` si le chemin contient `/src/`. Config lue dans `pyproject.toml` (aucun flag en dur). Sortie en exit 2 (stderr renvoyé à Claude) en cas d'erreur ou d'outil introuvable ; tests dans `tests/test_check_python_hook.py`.
+
 ## Critère d'arrêt (tâche déléguée terminée)
 
 Une tâche est terminée quand les 4 commandes de la CI passent, avec exactement ce périmètre :
