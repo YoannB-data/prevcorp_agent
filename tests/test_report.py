@@ -59,7 +59,7 @@ def test_entete_contient_les_champs_de_reproductibilite():
         "claude-sonnet-4-6",
         "Temperature : 0.0",
         "k : 5",
-        "Variante d'ingestion : none (déclarée, non vérifiée)",
+        "Variante d'ingestion : none (vérifiée contre la collection)",
         "Contexte isolé : document entier",
     ):
         assert attendu in entete
@@ -117,6 +117,29 @@ def test_chunks_e2e_integraux_pour_sans_reponse():
 
 def test_relecture_manuelle_signalee():
     assert "à vérifier à la main" in render_report(_report([_result()]))
+
+
+def test_reponses_e2e_et_isolee_presentes_apres_le_diagnostic():
+    result = _result(answer_e2e="Réponse A\nligne 2", answer_isolated="Réponse B")
+    texte = render_report(_report([result]))
+    assert "**Réponse e2e**" in texte and "**Réponse isolée**" in texte
+    assert "> Réponse A" in texte and "> ligne 2" in texte and "> Réponse B" in texte
+    assert texte.index("diagnostic :") < texte.index("**Réponse e2e**")
+    assert texte.index("**Réponse e2e**") < texte.index("**Réponse isolée**")
+
+
+def test_reponse_absente_affiche_aucune_y_compris_en_erreur_io():
+    erreur = QuestionResult(
+        id="RC02",
+        type="fait_simple",
+        retrieval=None,
+        e2e=None,
+        isolated=None,
+        diagnostic=Diagnostic.ERREUR,
+        error="APIConnectionError",
+    )
+    texte = render_report(_report([erreur, _result("RC01")]))
+    assert texte.count("> (aucune)") == 4
 
 
 def test_write_report_ecrit_un_fichier_par_run(tmp_path):
