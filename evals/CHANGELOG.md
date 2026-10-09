@@ -49,3 +49,5 @@ Format modifié le 9/10/2026 : le rapport liste désormais toutes les affirmatio
 ## Dette connue
 
 Le hash est calculé sur les octets du fichier : les commentaires d'en-tête des YAML ne peuvent pas être modifiés sans changer le hash, donc sans invalider la correspondance avec les rapports existants.
+
+Rapport SQL de référence : `evals/reports/sql/baselines/report_20260521_130635_legacy_no_header.md` (59/67, 88,1 %). Antérieur au format actuel : pas de modèle ni de hash du YAML dans l'en-tête, donc non rattachable à un état précis du jeu de questions.
