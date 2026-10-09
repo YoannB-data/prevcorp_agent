@@ -5,6 +5,7 @@ Pipeline d'ingestion : PDF → texte → chunks → embeddings Voyage → Qdrant
 import argparse
 import hashlib
 import os
+import re
 from collections import defaultdict
 from pathlib import Path
 from typing import Literal
@@ -30,8 +31,12 @@ COLLECTION_NAME = "prevcorp_docs"
 EMBEDDING_MODEL = "voyage-multilingual-2"
 CHUNK_SIZE = 150
 CHUNK_OVERLAP = 20
+MAX_ARTICLE_WORDS = 300
+# Lookahead : le titre de l'article reste en tête de sa section
+ARTICLE_START = re.compile(r"(?m)^(?=Article \d+ — )")
 
-Variant = Literal["none", "prefix"]
+Variant = Literal["none", "prefix", "prefix_article"]
+PREFIXED_VARIANTS = ("prefix", "prefix_article")
 
 
 def default_clients() -> tuple[voyageai.Client, QdrantClient]:
@@ -54,6 +59,29 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
         chunks.append(chunk)
         start += chunk_size - overlap
     return [c for c in chunks if len(c.strip()) > 50]
+
+
+def chunk_by_article(text: str, max_words: int = MAX_ARTICLE_WORDS) -> list[str]:
+    """Une section par « Article N — » ; texte sans article : découpage à taille fixe."""
+
+    sections = ARTICLE_START.split(text)
+    # Guard - sans article (Résumés, FAQ), on garde le découpage historique
+    if len(sections) == 1:
+        return chunk_text(text)
+    chunks: list[str] = []
+    for section in sections:
+        words = section.split()
+        if not words:
+            continue
+        if len(words) <= max_words:
+            chunks.append(" ".join(words))
+            continue
+        head, _, body = section.partition("\n")
+        # Le préambule n'a pas de titre à répéter ; un article oui
+        title = head.strip() if head.startswith("Article ") else ""
+        pieces = chunk_text(body if title else section)
+        chunks.extend(f"{title} {piece}".strip() for piece in pieces)
+    return chunks
 
 
 # ─── Métadonnées ─────────────────────────────────────────────────────────────
@@ -146,8 +174,8 @@ def ingest_pdf(
     if not text.strip():
         print(f"  ⚠ Texte vide : {pdf_path.name}")
         return 0, 0
-    chunks = chunk_text(text)
-    if variant == "prefix":
+    chunks = chunk_by_article(text) if variant == "prefix_article" else chunk_text(text)
+    if variant in PREFIXED_VARIANTS:
         prefix = document_prefix(text, pdf_path)
         embedded = [embedding_text(c, prefix) for c in chunks]
     else:
@@ -155,7 +183,7 @@ def ingest_pdf(
     result = voyage.embed(embedded, model=EMBEDDING_MODEL, input_type="document")
     embeddings = [[float(x) for x in vector] for vector in result.embeddings]
     upsert_chunks(qdrant, chunks, embeddings, pdf_path, variant)
-    return len(chunks), len(chunks) if variant == "prefix" else 0
+    return len(chunks), len(chunks) if variant in PREFIXED_VARIANTS else 0
 
 
 def ingest_corpus(
@@ -199,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
     """Point d'entrée CLI : --variant choisit l'embedding, --recreate vide l'index avant."""
 
     parser = argparse.ArgumentParser(description="Ingestion du corpus PrevCorp dans Qdrant")
-    parser.add_argument("--variant", choices=["none", "prefix"], default="none")
+    parser.add_argument("--variant", choices=["none", "prefix", "prefix_article"], default="none")
     parser.add_argument("--recreate", action="store_true", help="supprime la collection avant")
     args = parser.parse_args(argv)
     clients = default_clients()
