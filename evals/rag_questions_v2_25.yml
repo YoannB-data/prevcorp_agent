@@ -32,12 +32,11 @@ questions:
 
   - id: RC02
     question: "Le contrat C87656 prévoit-il un délai de carence avant la prise d'effet de la garantie ITT, et si oui lequel ?"
-    type: croisement
+    type: fait_simple
     contrat_cible: C87656
     reponse_attendue: "Oui, 3 mois"
-    sources_attendues: [REGLEMENT_prevcorp, RESUME_C87656]
+    sources_attendues: [RESUME_C87656]
     corpus_a_contenir: >
-      Règlement : article définissant le principe de carence.
       Résumé C87656 : ligne garantie ITT avec délai de carence = 3 mois.
     points_obligatoires:
       - id: O0
@@ -112,11 +111,11 @@ questions:
 
   - id: RC06
     question: "Quel est le taux de couverture de l'invalidité sur le contrat C39949, pour les 3 catégories ?"
-    type: croisement
+    type: fait_simple
     contrat_cible: C39949
     reponse_attendue: "Invalidité 1re catégorie : 35 % (tranches A et B) et 25 % (tranche C) ; 2e catégorie : 45 % (A et B) et 35 % (C) ; 3e catégorie : 70 % (A et B) et 55 % (C) du salaire annuel brut de référence."
-    sources_attendues: [REGLEMENT_prevcorp, RESUME_C39949]
-    corpus_a_contenir: "Règlement : définition des 3 catégories d'invalidité. Résumé C39949 : taux de couverture par catégorie."
+    sources_attendues: [RESUME_C39949]
+    corpus_a_contenir: "Résumé C39949 : taux de couverture par catégorie."
     points_obligatoires:
       - id: O0
         texte: "Invalidité 1re catégorie : 35 % en tranches A et B, 25 % en tranche C"
@@ -133,11 +132,11 @@ questions:
 
   - id: RC07
     question: "Quel est le taux de couverture de l'incapacité sur le contrat C87656, et la franchise associée ?"
-    type: croisement
+    type: fait_simple
     contrat_cible: C87656
     reponse_attendue: "Indemnité journalière de 82 % du salaire de référence en tranche A et 78 % en tranche B, après une franchise contractuelle de 90 jours."
-    sources_attendues: [REGLEMENT_prevcorp, RESUME_C87656]
-    corpus_a_contenir: "Règlement : définition de la garantie incapacité. Résumé C87656 : taux de couverture ITT + jours de franchise."
+    sources_attendues: [RESUME_C87656]
+    corpus_a_contenir: "Résumé C87656 : taux de couverture ITT + jours de franchise."
     points_obligatoires:
       - id: O0
         texte: "Indemnité journalière de 82 % en tranche A"
@@ -216,11 +215,11 @@ questions:
 
   - id: RC10
     question: "Y a-t-il des garanties optionnelles disponibles sur le contrat C87656 ?"
-    type: croisement
+    type: fait_simple
     contrat_cible: C87656
     reponse_attendue: "Oui, deux garanties optionnelles souscrites sur C87656 : la rente de conjoint (15 % en tranche A et en tranche B) et la garantie obsèques (capital forfaitaire de 2 500 €)."
-    sources_attendues: [REGLEMENT_prevcorp, RESUME_C87656]
-    corpus_a_contenir: "Règlement : catalogue des garanties optionnelles possibles. Résumé C87656 : lesquelles sont effectivement souscrites."
+    sources_attendues: [RESUME_C87656]
+    corpus_a_contenir: "Résumé C87656 : garanties optionnelles effectivement souscrites."
     points_obligatoires:
       - id: O0
         texte: "La rente de conjoint est souscrite"

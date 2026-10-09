@@ -76,6 +76,8 @@ uv run python evals/run_evals.py --ids Q012 Q034 # questions spécifiques
 
 Les résultats sont écrits dans `evals/reports/` (Markdown horodaté) et `evals/reports/latest.json` (lu par la sidebar Streamlit).
 
+Historique des jeux de questions RAG et de leurs hashes : [evals/CHANGELOG.md](evals/CHANGELOG.md).
+
 ## Structure
 
 ```
