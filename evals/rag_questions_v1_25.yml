@@ -80,7 +80,7 @@ questions:
     corpus_a_contenir: "Absence volontaire et vérifiée : aucune mention de rapatriement à l'étranger dans le Règlement ni ailleurs."
     points_obligatoires:
       - id: O0
-        texte: "La réponse indique que l'information n'est pas disponible dans les documents (aucune couverture du rapatriement n'est mentionnée)"
+        texte: "La réponse indique que l'information n'est pas disponible dans les documents"
         formes: ["Je ne trouve pas cette information dans les documents disponibles"]
         verif: juge
     points_interdits:
@@ -354,7 +354,7 @@ questions:
       Piège voulu : la Notice Métallurgie (vraie et distracteur) cite la rente de conjoint comme garantie optionnelle (art. 16).
     points_obligatoires:
       - id: O0
-        texte: "La réponse indique qu'aucun taux n'est disponible dans les documents (rente de conjoint non souscrite sur C73736)"
+        texte: "La réponse indique qu'aucun taux n'est disponible dans les documents"
         formes: ["Je ne trouve pas cette information dans les documents disponibles"]
         verif: juge
     points_interdits:
