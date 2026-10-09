@@ -27,11 +27,10 @@ Hashes de v1 :
 
 La correction (O0 des questions `sans_reponse` réduit au seul refus, commit `5e2d1a2`) a été faite dans le working tree le 8/10 et commitée le 9/10.
 
-<<<<<<< HEAD
 ## Format du rapport faithfulness
 
 Format modifié le 9/10/2026 : le rapport liste désormais toutes les affirmations de chaque réponse avec leur verdict (`appuyée` / `NON appuyée`), et non plus seulement les NON appuyées. Le baseline antérieur `faithfulness_20261009_105818_prefix_ae7aed3dcc6a.md` n'a que la liste des NON appuyées : il n'est pas comparable ligne à ligne aux nouveaux rapports. Les runs filtrés par `--ids` portent le suffixe `_partial` et n'ont pas de moyennes.
-=======
+
 ## Rapports de référence
 
 `evals/reports/rag/baselines/` ne contient que des runs complets sur un hash de ce CHANGELOG, plus le run k=20 signalé par son suffixe `_partial`. Les chiffres des posts renvoient à ces fichiers. Les autres rapports de `evals/reports/rag/` restent ignorés par git.
@@ -45,7 +44,6 @@ Format modifié le 9/10/2026 : le rapport liste désormais toutes les affirmatio
 | `faithfulness_20261009_105818_prefix_ae7aed3dcc6a.md` | `ae7aed3dcc6a` (v1) | prefix | 5 |
 | `rag_20261009_112048_prefix_ddfd3583dae4.md` | `ddfd3583dae4` (v2) | prefix | 5 |
 | `rag_20261009_113428_none_ddfd3583dae4.md` | `ddfd3583dae4` (v2) | none | 5 |
->>>>>>> feat/eval-baselines
 
 ## Dette connue
 
