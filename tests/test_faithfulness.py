@@ -132,3 +132,27 @@ def test_render_report_entete_synthese_et_detail():
 def test_report_filename():
     nom = report_filename(datetime(2026, 10, 9, 10, 0, 0), "prefix", "abc123")
     assert nom == "faithfulness_20261009_100000_prefix_abc123.md"
+
+
+def test_extraction_refus_melange_aux_faits_score_les_faits():
+    judge, appels = _judge(
+        '["Le taux est de 50 %.", "Le concubin exige une résidence commune."]',
+        '{"A1": true, "A2": true}',
+    )
+    reponse = "Le taux est de 50 %. Cependant, je ne trouve pas cette information."
+    result = score_faithfulness(judge, "q", reponse, CHUNKS)  # type: ignore[arg-type]
+    assert result.score == 1.0 and len(result.claims) == 2
+    assert "mélanger refus et faits" in appels[0]["system"]
+
+
+def test_extraction_prompt_ecarte_meta_documents_et_jugements_de_valeur():
+    judge, appels = _judge("[]")
+    score_faithfulness(judge, "q", "Le Règlement n'a pas été consulté.", CHUNKS)  # type: ignore[arg-type]
+    system = appels[0]["system"]
+    assert "documents consultés" in system and "jugements de valeur" in system
+
+
+def test_refus_pur_reste_na():
+    judge, appels = _judge("[]")
+    result = score_faithfulness(judge, "q", "Je ne trouve pas cette information.", CHUNKS)  # type: ignore[arg-type]
+    assert result.score is None and len(appels) == 1
