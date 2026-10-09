@@ -12,6 +12,9 @@ evals/reports/*
 !evals/reports/rag/
 evals/reports/rag/*
 !evals/reports/rag/baselines/
+!evals/reports/sql/
+evals/reports/sql/*
+!evals/reports/sql/baselines/
 logs/
 .env
 sandbox.*
