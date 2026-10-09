@@ -63,13 +63,15 @@ class FaithfulnessResult:
 
 @dataclass
 class FaithfulnessRow:
-    """Résultat d'une question : score, affirmations non appuyées, ou erreur d'I/O."""
+    """Résultat d'une question : score, affirmations avec verdict, ou erreur d'I/O."""
 
     id: str
     type: str
     score: float | None = None
     n_claims: int = 0
     unsupported: list[str] = field(default_factory=list)
+    claims: dict[str, str] = field(default_factory=dict)
+    verdicts: dict[str, bool] = field(default_factory=dict)
     answer: str = ""
     error: str | None = None
 
@@ -141,7 +143,7 @@ def mean_score(rows: list[FaithfulnessRow], type_: str | None = None) -> str:
 
 
 def render_row(row: FaithfulnessRow) -> str:
-    """Section d'une question : score, affirmations non appuyées, réponse en citation."""
+    """Section d'une question : score, toutes les affirmations avec verdict, réponse en citation."""
 
     lines = [f"### {row.id} ({row.type})", ""]
     if row.error is not None:
@@ -149,11 +151,28 @@ def render_row(row: FaithfulnessRow) -> str:
         return "\n".join(lines)
     score = "N/A (aucune affirmation)" if row.score is None else f"{row.score:.2f}"
     lines += [f"- faithfulness : {score} ({row.n_claims} affirmations)"]
-    if row.unsupported:
-        lines += ["- affirmations NON appuyées :", *(f"  - {text}" for text in row.unsupported)]
+    if row.claims:
+        lines += ["- affirmations :"]
+        for cid, text in row.claims.items():
+            verdict = "appuyée" if row.verdicts[cid] else "NON appuyée"
+            lines += [f"  - {cid} [{verdict}] {text}"]
     corps = row.answer.strip() or "(aucune)"
     lines += ["", "**Réponse e2e**", "", *(f"> {ligne}" for ligne in corps.splitlines()), ""]
     return "\n".join(lines)
+
+
+def _summary_table(rows: list[FaithfulnessRow], partial: bool) -> list[str]:
+    """Tableau des moyennes par type ; un run partiel n'en porte pas."""
+
+    if partial:
+        return ["Rapport PARTIEL (--ids) : aucune moyenne calculée.", ""]
+    return [
+        "| Type | Faithfulness moyenne |",
+        "|---|---|",
+        f"| **Tous** | {mean_score(rows)} |",
+        *(f"| {t} | {mean_score(rows, t)} |" for t in TYPES),
+        "",
+    ]
 
 
 def render_report(
@@ -165,8 +184,9 @@ def render_report(
     judge_model: str,
     k: int,
     variant: str,
+    partial: bool = False,
 ) -> str:
-    """Rapport markdown : en-tête, moyennes par type, détail par question."""
+    """Rapport markdown : en-tête, moyennes par type (sauf partiel), détail par question."""
 
     erreurs = sum(r.error is not None for r in rows)
     lines = [
@@ -184,11 +204,7 @@ def render_report(
         "",
         f"Questions : {len(rows)} dont {erreurs} en erreur d'I/O (exclues des moyennes).",
         "",
-        "| Type | Faithfulness moyenne |",
-        "|---|---|",
-        f"| **Tous** | {mean_score(rows)} |",
-        *(f"| {t} | {mean_score(rows, t)} |" for t in TYPES),
-        "",
+        *_summary_table(rows, partial),
         "## Détail par question",
         "",
         *(render_row(r) for r in rows),
@@ -196,10 +212,11 @@ def render_report(
     return "\n".join(lines)
 
 
-def report_filename(date: datetime, variant: str, yaml_hash: str) -> str:
-    """Nom de fichier : date + variante d'ingestion + hash du YAML."""
+def report_filename(date: datetime, variant: str, yaml_hash: str, partial: bool = False) -> str:
+    """Nom de fichier : date + variante d'ingestion + hash du YAML, suffixe _partial si filtré."""
 
-    return f"faithfulness_{date.strftime('%Y%m%d_%H%M%S')}_{variant}_{yaml_hash}.md"
+    suffix = "_partial" if partial else ""
+    return f"faithfulness_{date.strftime('%Y%m%d_%H%M%S')}_{variant}_{yaml_hash}{suffix}.md"
 
 
 def write_report(content: str, directory: Path, filename: str) -> Path:
