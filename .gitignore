@@ -9,6 +9,9 @@ qdrant_storage/
 __pycache__/
 evals/reports/*
 !evals/reports/latest.json
+!evals/reports/rag/
+evals/reports/rag/*
+!evals/reports/rag/baselines/
 logs/
 .env
 sandbox.*
