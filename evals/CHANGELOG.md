@@ -21,4 +21,12 @@ Les 21 autres questions sont inchangées. Le changement de score entre v1 et v2 
 
 Remplace v0 : `sources_attendues` en liste de `doc_id`, `contexte_isole` optionnel, `points_obligatoires` et `points_interdits` renseignés pour les 25 questions.
 
-Note : le commit `5e2d1a2` (2026-10-09, O0 des questions `sans_reponse` réduit au seul refus) a modifié le texte de 2 points dans v1 après coup. Un rapport v1 produit avant ce commit ne correspond donc plus au hash `ae7aed3dcc6a` actuel.
+Hashes de v1 :
+- `66873617cdfb` : v1 avant correction de l'O0 de RC04 et RC17. Les rapports portant ce hash ne sont pas à utiliser.
+- `ae7aed3dcc6a` : v1 corrigé, hash actuel du fichier. C'est celui des baselines du 8/10 et du 9/10.
+
+La correction (O0 des questions `sans_reponse` réduit au seul refus, commit `5e2d1a2`) a été faite dans le working tree le 8/10 et commitée le 9/10.
+
+## Dette connue
+
+Le hash est calculé sur les octets du fichier : les commentaires d'en-tête des YAML ne peuvent pas être modifiés sans changer le hash, donc sans invalider la correspondance avec les rapports existants.
