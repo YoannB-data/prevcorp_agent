@@ -19,8 +19,14 @@ EXTRACT_SYSTEM_PROMPT = """Tu extrais les affirmations factuelles d'une réponse
 Règles :
 - Une affirmation = une proposition atomique et autonome (un fait, un chiffre, une condition).
 - Reformule sans pronom ni renvoi au contexte pour que chaque affirmation se comprenne seule.
-- Ignore les citations de sources, les formules de politesse et les refus de répondre.
-- Si la réponse n'affirme aucun fait, renvoie une liste vide.
+- Ignore les citations de sources et les formules de politesse.
+- Une réponse peut mélanger refus et faits : extrais les faits énoncés, ignore seulement la \
+phrase de refus (« je ne trouve pas cette information »).
+- Ignore les affirmations sur les documents consultés ou disponibles (« le Règlement n'a pas été \
+consulté », « les extraits ne précisent pas »).
+- Ignore les jugements de valeur et les recommandations (« plus favorable », « conseillé »), \
+mais garde les valeurs chiffrées comparées.
+- Renvoie une liste vide uniquement si la réponse n'énonce aucun fait.
 Réponds uniquement par un tableau JSON de chaînes, sans commentaire."""
 
 VERIFY_SYSTEM_PROMPT = """Tu es un correcteur strict. On te donne des extraits de documents et \
