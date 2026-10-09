@@ -27,6 +27,20 @@ Hashes de v1 :
 
 La correction (O0 des questions `sans_reponse` réduit au seul refus, commit `5e2d1a2`) a été faite dans le working tree le 8/10 et commitée le 9/10.
 
+## Rapports de référence
+
+`evals/reports/rag/baselines/` ne contient que des runs complets sur un hash de ce CHANGELOG, plus le run k=20 signalé par son suffixe `_partial`. Les chiffres des posts renvoient à ces fichiers. Les autres rapports de `evals/reports/rag/` restent ignorés par git.
+
+| Rapport | Hash | Variante | k |
+|---------|------|----------|---|
+| `rag_20261008_171336_none_ae7aed3dcc6a.md` | `ae7aed3dcc6a` (v1) | none | 5 |
+| `rag_20261008_172051_prefix_ae7aed3dcc6a.md` | `ae7aed3dcc6a` (v1) | prefix | 5 |
+| `rag_20261008_173416_prefix_ae7aed3dcc6a_k20_partial.md` | `ae7aed3dcc6a` (v1) | prefix | 20 (partiel) |
+| `rag_20261009_101400_prefix_article_ae7aed3dcc6a.md` | `ae7aed3dcc6a` (v1) | prefix_article | 5 |
+| `faithfulness_20261009_105818_prefix_ae7aed3dcc6a.md` | `ae7aed3dcc6a` (v1) | prefix | 5 |
+| `rag_20261009_112048_prefix_ddfd3583dae4.md` | `ddfd3583dae4` (v2) | prefix | 5 |
+| `rag_20261009_113428_none_ddfd3583dae4.md` | `ddfd3583dae4` (v2) | none | 5 |
+
 ## Dette connue
 
 Le hash est calculé sur les octets du fichier : les commentaires d'en-tête des YAML ne peuvent pas être modifiés sans changer le hash, donc sans invalider la correspondance avec les rapports existants.
