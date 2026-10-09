@@ -18,7 +18,7 @@ uv run pre-commit install                        # install git hooks (once per c
 uv run streamlit run src/app.py                  # launch Streamlit UI
 uv run python evals/run_evals.py                 # run full eval suite (SQL pipeline only)
 uv run python evals/run_evals.py --ids Q012 Q034 # run specific evals by ID
-uv run pytest tests/test_foo.py::test_bar        # run a single test
+uv run pytest tests/test_scorers.py::test_piege_60_contre_90  # run a single test
 
 # Checks CI (critère d'arrêt, exactement ce périmètre)
 uv run ruff format --check src/ tests/ evals/
@@ -55,7 +55,10 @@ src/
     ingestion.py          # PDF → text → chunks → Voyage embeddings → Qdrant (run standalone to (re)build the index)
     retriever.py           # question → top-k relevant chunks from Qdrant
     generator.py            # chunks + question → cited answer via Claude
-    evaluation/             # RAG eval runner package (retrieval, scorers, judge, diagnose, report)
+    pdf_text.py             # PDF text extraction (pdfplumber), no external client
+    metadata.py             # Corpus document metadata (doc_id, doc_type), no external client
+    eval_schema.py          # Fail-fast schema/loader for the RAG eval YAML
+    evaluation/             # RAG eval runner package (retrieval, scorers, judge, faithfulness, diagnose, report)
   prompts/
     system_prompt.md   # System prompt injected into every SQL agent call
     few_shot_bank.yml  # Few-shot examples pool (question + sql + keywords)
@@ -67,6 +70,7 @@ evals/
   reports/               # Timestamped Markdown reports + latest.json (read by sidebar)
 corpus/                # Generated PDFs (chunked for the RAG index) — gitignored, derivable from corpus_src/*.html via render.py; never the source of truth
 corpus_src/            # HTML source of each corpus document, committed to git — the real content asset (LLM-generated, non-deterministic), since eval questions reference exact values inside it
+scripts/               # dump_chunks.py (read-only Qdrant chunk viewer); render.py is referenced below but absent from this checkout
 qdrant_storage/        # Local (embedded) Qdrant collection, populated by src/rag/ingestion.py
 logs/
   interactions.jsonl   # Append-only log: question, sql, status, tokens, cost, latency
@@ -86,7 +90,7 @@ logs/
 - `few_shot_bank.yml` is **reloaded on every call** to `agent_main` (no module-level cache) — changes take effect immediately without restart.
 - Schema comes from `manifest.json` (dbt nodes, `marts` layer only). Metrics come from `semantic_manifest.json` (dbt semantic layer). Both paths via env vars.
 - SQL must be wrapped in a ` ```sql ``` ` fence; `_extract_sql` raises `ValueError` otherwise.
-- Model: `claude-sonnet-4-6` (shared by the SQL agent, the router, and the RAG generator via `src/config.py`), `MAX_TOKENS=1024`, `temperature=0` on the SQL agent and router. Prompt caching not yet implemented.
+- Model: a single `MODEL` constant in `src/config.py` shared by the SQL agent, the router, and the RAG generator (check it there, not here), `MAX_TOKENS=1024`, `temperature=0` on the SQL agent and router. Prompt caching not yet implemented.
 - `agent_main` accepts an optional `eval_question_id` for traceability in the JSONL log.
 - `LOGS_JSONL_PATH` (`logs/interactions.jsonl`) is relative to CWD — always launch from the project root.
 - `duckdb_executor.py` opens DuckDB in **read-only mode**; any write attempt raises an error at the DB level.
@@ -138,6 +142,10 @@ Run evals after significant changes to `src/structured/sql_agent.py`, `src/struc
 
 `mypy` ne vérifie que `src/` : `tests/` est hors périmètre CI, et `disallow_untyped_defs` y est relâché (override dans `pyproject.toml`).
 
+## Hook PostToolUse
+
+`.claude/hooks/check_python.py` (déclaré dans `.claude/settings.json`, matcher `Edit|Write`) lance `ruff check` sur tout `.py` écrit ou édité, puis `mypy` si le chemin contient `/src/`. Config lue dans `pyproject.toml` (aucun flag en dur). Sortie en exit 2 (stderr renvoyé à Claude) en cas d'erreur ou d'outil introuvable ; tests dans `tests/test_check_python_hook.py`.
+
 ## Critère d'arrêt (tâche déléguée terminée)
 
 Une tâche est terminée quand les 4 commandes de la CI passent, avec exactement ce périmètre :
@@ -172,11 +180,7 @@ Types courants : `feat`, `fix`, `refactor`, `docs`, `chore`
 
 ## Code Style
 
-```bash
-uv run ruff format src/ tests/ evals/   # formatage (remplace black + isort)
-uv run ruff check src/ tests/ evals/    # lint
-uv run mypy src/                        # type checking
-```
+Commandes de format, lint et typage : voir « Environment & Package Manager » (ruff remplace black + isort).
 
 ## Conventions de commentaires
 
