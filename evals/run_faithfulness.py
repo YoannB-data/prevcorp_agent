@@ -59,6 +59,8 @@ def main() -> int:
                 score=result.score,
                 n_claims=len(result.claims),
                 unsupported=result.unsupported,
+                claims=result.claims,
+                verdicts=result.verdicts,
                 answer=answer,
             )
         except Exception as exc:
@@ -68,6 +70,7 @@ def main() -> int:
         print(f"{row.id} : {row.error or row.score}")
 
     now = datetime.now()
+    partial = bool(args.ids)
     yaml_hash = hash_yaml(args.yaml)
     content = render_report(
         rows,
@@ -77,8 +80,11 @@ def main() -> int:
         judge_model=deps.judge_model,
         k=args.k,
         variant=VARIANT,
+        partial=partial,
     )
-    path = write_report(content, REPORTS_DIR, report_filename(now, VARIANT, yaml_hash))
+    path = write_report(
+        content, REPORTS_DIR, report_filename(now, VARIANT, yaml_hash, partial=partial)
+    )
     print(f"Rapport : {path}")
     return 1 if any(r.error for r in rows) else 0
 

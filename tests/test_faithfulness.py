@@ -86,7 +86,14 @@ def test_score_faithfulness_verdict_manquant_leve():
 ROWS = [
     FaithfulnessRow(id="RC01", type="fait_simple", score=1.0, n_claims=2, answer="ok"),
     FaithfulnessRow(
-        id="RC02", type="fait_simple", score=0.5, n_claims=2, unsupported=["faux"], answer="a\nb"
+        id="RC02",
+        type="fait_simple",
+        score=0.5,
+        n_claims=2,
+        unsupported=["faux"],
+        claims={"A1": "vrai", "A2": "faux"},
+        verdicts={"A1": True, "A2": False},
+        answer="a\nb",
     ),
     FaithfulnessRow(id="RC03", type="sans_reponse", score=None, n_claims=0, answer="refus"),
     FaithfulnessRow(id="RC04", type="croisement", error="RuntimeError: boom"),
@@ -101,14 +108,17 @@ def test_mean_score_par_type_exclut_na_et_erreurs():
     assert mean_score([]) == "N/A"
 
 
-def test_render_row_liste_les_non_appuyees():
+def test_render_row_liste_toutes_les_affirmations_avec_verdict():
     texte = render_row(ROWS[1])
-    assert "0.50 (2 affirmations)" in texte and "  - faux" in texte
+    assert "0.50 (2 affirmations)" in texte
+    assert "- affirmations :\n  - A1 [appuyée] vrai\n  - A2 [NON appuyée] faux" in texte
     assert "> a\n> b" in texte
 
 
 def test_render_row_na_et_erreur():
     assert "N/A (aucune affirmation)" in render_row(ROWS[2])
+    assert "- affirmations :" not in render_row(ROWS[2])
+    assert "- affirmations :" not in render_row(ROWS[2])
     assert "ERREUR d'I/O" in render_row(ROWS[3])
 
 
@@ -156,3 +166,24 @@ def test_refus_pur_reste_na():
     judge, appels = _judge("[]")
     result = score_faithfulness(judge, "q", "Je ne trouve pas cette information.", CHUNKS)  # type: ignore[arg-type]
     assert result.score is None and len(appels) == 1
+
+
+def test_report_filename_partiel():
+    nom = report_filename(datetime(2026, 10, 9, 10, 0, 0), "prefix", "abc123", partial=True)
+    assert nom == "faithfulness_20261009_100000_prefix_abc123_partial.md"
+
+
+def test_render_report_partiel_sans_moyenne():
+    texte = render_report(
+        ROWS,
+        date=datetime(2026, 10, 9, 10, 0, 0),
+        yaml_hash="abc123",
+        model="m",
+        judge_model="j",
+        k=5,
+        variant="prefix",
+        partial=True,
+    )
+    assert "Rapport PARTIEL" in texte
+    assert "| **Tous** |" not in texte and "Faithfulness moyenne" not in texte
+    assert "### RC02 (fait_simple)" in texte
