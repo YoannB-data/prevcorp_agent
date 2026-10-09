@@ -43,6 +43,7 @@ Format modifié le 9/10/2026 : le rapport liste désormais toutes les affirmatio
 | `rag_20261009_101400_prefix_article_ae7aed3dcc6a.md` | `ae7aed3dcc6a` (v1) | prefix_article | 5 |
 | `faithfulness_20261009_105818_prefix_ae7aed3dcc6a.md` | `ae7aed3dcc6a` (v1) | prefix | 5 |
 | `rag_20261009_112048_prefix_ddfd3583dae4.md` | `ddfd3583dae4` (v2) | prefix | 5 |
+| `faithfulness_20261009_140338_prefix_ddfd3583dae4_partial.md` | `ddfd3583dae4` (v2) | prefix | 5 (partiel : RC17, RC20, RC24, RC25) |
 | `rag_20261009_113428_none_ddfd3583dae4.md` | `ddfd3583dae4` (v2) | none | 5 |
 
 ## Dette connue
