@@ -22,7 +22,7 @@ def main() -> int:
     parser.add_argument("--k", type=int, default=DEFAULT_K, help="taille du top-k du retrieval")
     parser.add_argument(
         "--variant",
-        choices=["none", "prefix", "contextual"],
+        choices=["none", "prefix", "prefix_article", "contextual"],
         default="none",
         help="variante d'ingestion attendue, vérifiée contre la collection",
     )
