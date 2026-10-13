@@ -139,7 +139,7 @@ def test_fichier_reel_respecte_le_contrat():
     if not pdfs:
         pytest.skip("corpus/ absent ou vide (gitignoré)")
     valid = {p.stem for p in pdfs}
-    questions = load_questions(ROOT / "evals" / "rag_questions_v1_25.yml", valid)
+    questions = load_questions(ROOT / "evals" / "rag" / "eval_set.yml", valid)
     assert len(questions) == 25
 
 

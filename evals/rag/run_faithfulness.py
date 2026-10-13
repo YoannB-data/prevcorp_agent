@@ -5,7 +5,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.rag.eval_schema import load_questions
 from src.rag.evaluation.faithfulness import (
@@ -17,8 +17,8 @@ from src.rag.evaluation.faithfulness import (
 )
 from src.rag.evaluation.report import hash_yaml
 
-EVAL_FILE = Path(__file__).parent / "rag_questions_v1_25.yml"
-REPORTS_DIR = Path(__file__).parent / "reports" / "rag"
+EVAL_FILE = Path(__file__).parent / "eval_set.yml"
+REPORTS_DIR = Path(__file__).parent / "reports"
 DEFAULT_K = 5
 VARIANT = "prefix"
 

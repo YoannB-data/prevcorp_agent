@@ -9,9 +9,8 @@ qdrant_storage/
 __pycache__/
 evals/reports/*
 !evals/reports/latest.json
-!evals/reports/rag/
-evals/reports/rag/*
-!evals/reports/rag/baselines/
+evals/rag/reports/*
+!evals/rag/reports/baselines/
 evals/sql/reports/*
 !evals/sql/reports/baselines/
 logs/

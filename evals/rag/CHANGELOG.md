@@ -4,8 +4,17 @@ Le hash du YAML (nom des rapports, champ « Hash du YAML ») est le sha256 des *
 
 | Version | Fichier | Hash |
 |---------|---------|------|
-| v1 | `rag_questions_v1_25.yml` | `ae7aed3dcc6a` |
-| v2 | `rag_questions_v2_25.yml` | `ddfd3583dae4` |
+| v1 | `rag_questions_v1_25.yml` (supprimé du dépôt, voir Réorganisation) | `ae7aed3dcc6a` |
+| v2 | `rag_questions_v2_25.yml`, devenu `evals/rag/eval_set.yml` | `ddfd3583dae4` |
+
+## Réorganisation (2026-10-13)
+
+Déplacements sans changement de contenu : les octets des YAML sont identiques, donc les hashes aussi.
+
+- `evals/rag_questions_v2_25.yml` → `evals/rag/eval_set.yml` (hash `ddfd3583dae4`). C'est désormais le jeu par défaut de `evals/rag/run_evals.py` et de `evals/rag/run_faithfulness.py`, qui pointaient sur v1.
+- `evals/rag_questions_v1_25.yml` est supprimé du working tree. Son historique reste dans git (`git log --follow -- evals/rag_questions_v1_25.yml`) ; les baselines au hash `ae7aed3dcc6a` s'y rattachent.
+- Baselines RAG : `evals/reports/rag/baselines/` → `evals/rag/reports/baselines/`. Baseline SQL : `evals/reports/sql/baselines/` → `evals/sql/reports/baselines/`.
+- Ce fichier : `evals/CHANGELOG.md` → `evals/rag/CHANGELOG.md`.
 
 ## v2 (2026-10-09)
 
@@ -33,7 +42,7 @@ Format modifié le 9/10/2026 : le rapport liste désormais toutes les affirmatio
 
 ## Rapports de référence
 
-`evals/reports/rag/baselines/` ne contient que des runs complets sur un hash de ce CHANGELOG, plus le run k=20 signalé par son suffixe `_partial`. Les chiffres des posts renvoient à ces fichiers. Les autres rapports de `evals/reports/rag/` restent ignorés par git.
+`evals/rag/reports/baselines/` ne contient que des runs complets sur un hash de ce CHANGELOG, plus le run k=20 signalé par son suffixe `_partial`. Les chiffres des posts renvoient à ces fichiers. Les autres rapports de `evals/rag/reports/` restent ignorés par git.
 
 | Rapport | Hash | Variante | k |
 |---------|------|----------|---|
@@ -50,4 +59,4 @@ Format modifié le 9/10/2026 : le rapport liste désormais toutes les affirmatio
 
 Le hash est calculé sur les octets du fichier : les commentaires d'en-tête des YAML ne peuvent pas être modifiés sans changer le hash, donc sans invalider la correspondance avec les rapports existants.
 
-Rapport SQL de référence : `evals/reports/sql/baselines/report_20260521_130635_legacy_no_header.md` (59/67, 88,1 %). Antérieur au format actuel : pas de modèle ni de hash du YAML dans l'en-tête, donc non rattachable à un état précis du jeu de questions.
+Rapport SQL de référence : `evals/sql/reports/baselines/report_20260521_130635_legacy_no_header.md` (59/67, 88,1 %). Antérieur au format actuel : pas de modèle ni de hash du YAML dans l'en-tête, donc non rattachable à un état précis du jeu de questions.
