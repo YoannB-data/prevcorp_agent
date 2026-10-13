@@ -47,6 +47,11 @@ questions:
         texte: "La réponse confirme qu'il existe bien un délai de carence"
         formes: ["délai de carence"]
         verif: juge
+    points_interdits:
+      - id: I0
+        texte: "La réponse confond avec le jour de carence de la Sécurité sociale ou avec la franchise de 90 jours"
+        formes: ["jour de carence", "90 jours"]
+        verif: juge
 
   - id: RC03
     question: "Le concubin est-il inclus dans la désignation de bénéficiaire type du contrat C87656 ?"
@@ -54,19 +59,19 @@ questions:
     contrat_cible: C87656
     reponse_attendue: >
       Oui selon la Notice CCN Santé et action sociale (concubin inclus sous condition de résidence commune),
-      alors que le Règlement générique ne le mentionne pas — écart délibéré entre les deux documents.
+      alors que la clause bénéficiaire type du Règlement générique ne le liste pas — écart délibéré entre les deux documents.
     sources_attendues: [REGLEMENT_prevcorp, NOTICE_CCN_sante_action_sociale]
     corpus_a_contenir: >
-      Règlement : clause bénéficiaire type = conjoint ou pacsé, à défaut enfants, à défaut parents, à défaut ascendants, à défaut héritiers (pas de mention du concubin).
+      Règlement : clause bénéficiaire type = conjoint ou partenaire de PACS, à défaut enfants, à défaut parents, à défaut ascendants, à défaut héritiers (concubin absent de la clause ; il n'apparaît que dans le tableau des justificatifs).
       Notice CCN Santé et action sociale : même clause + concubin sous condition de résidence commune — écart délibéré à injecter.
     points_obligatoires:
       - id: O0
         texte: "La Notice CCN Santé et action sociale inclut le concubin, sous condition de résidence commune"
-        formes: ["concubin"]
+        formes: ["concubin", "résidence commune"]
         verif: juge
       - id: O1
-        texte: "Le Règlement générique ne mentionne pas le concubin : écart entre les deux documents"
-        formes: ["conjoint"]
+        texte: "La clause bénéficiaire type du Règlement générique ne liste pas le concubin (conjoint ou partenaire de PACS uniquement) : écart entre les deux documents"
+        formes: ["pacte civil de solidarité"]
         verif: juge
 
   - id: RC04
@@ -80,19 +85,19 @@ questions:
     points_obligatoires:
       - id: O0
         texte: "La réponse indique que l'information n'est pas disponible dans les documents"
-        formes: ["Je ne trouve pas cette information dans les documents disponibles"]
+        formes: ["ne trouve pas", "aucune mention", "pas d'information"]
         verif: juge
     points_interdits:
       - id: I0
-        texte: "La réponse affirme que le contrat C39949 couvre le rapatriement à l'étranger"
-        formes: ["rapatriement"]
+        texte: "La réponse affirme que le contrat C39949 couvre le rapatriement à l'étranger, ou l'infère de la section Assistance du Résumé"
+        formes: ["rapatriement", "assistance"]
         verif: juge
 
   - id: RC05
     question: "Y a-t-il un écart entre le Résumé des garanties du contrat C39949 et la Notice CCN Agriculture sur la garantie ITT ?"
     type: croisement
     contrat_cible: C39949
-    reponse_attendue: "Oui — Résumé C39949 indique une franchise ITT de 60 jours, alors que la Notice CCN Agriculture indique 90 jours."
+    reponse_attendue: "Oui — Résumé C39949 indique une franchise ITT de 60 jours, alors que la Notice CCN Agriculture indique 90 jours. Le Résumé, propre au contrat, prime."
     sources_attendues: [RESUME_C39949, NOTICE_CCN_agriculture]
     corpus_a_contenir: "Résumé C39949 : franchise ITT = 60 jours. Notice CCN Agriculture : franchise ITT = 90 jours — écart délibéré à injecter."
     points_obligatoires:
@@ -107,6 +112,11 @@ questions:
       - id: O2
         texte: "La réponse conclut à un écart entre le Résumé et la Notice"
         formes: ["60 jours", "90 jours"]
+        verif: juge
+    points_interdits:
+      - id: I0
+        texte: "La réponse conclut à l'absence d'écart entre le Résumé et la Notice"
+        formes: ["aucun écart", "pas d'écart"]
         verif: juge
 
   - id: RC06
