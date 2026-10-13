@@ -6,6 +6,19 @@ Le hash du YAML (nom des rapports, champ « Hash du YAML ») est le sha256 des *
 |---------|---------|------|
 | v1 | `rag_questions_v1_25.yml` (supprimé du dépôt, voir Réorganisation) | `ae7aed3dcc6a` |
 | v2 | `rag_questions_v2_25.yml`, devenu `evals/rag/eval_set.yml` | `ddfd3583dae4` |
+| v3 | `evals/rag/eval_set.yml` | `f12821773e6c` |
+
+## v3 (2026-10-13)
+
+Motif : revue de RC01 à RC05 par le subagent `eval-reviewer` (RC01 et RC02 PASS, RC03, RC04 et RC05 À REVOIR). Les 20 autres questions (RC06 à RC25) sont inchangées.
+
+- RC02 : ajout de `points_interdits` I0 (confusion avec le jour de carence de la Sécurité sociale ou la franchise de 90 jours, `verif: juge`).
+- RC03 : la `reponse_attendue` affirmait que le Règlement ne mentionne pas le concubin, ce qui est inexact (il figure dans le tableau des justificatifs, l. 153). Reformulée : la clause bénéficiaire type du Règlement ne le liste pas. O0 : formes `["concubin", "résidence commune"]`. O1 : forme `["pacte civil de solidarité"]` au lieu de `["conjoint"]`. `corpus_a_contenir` mis à jour.
+- RC04 : O0 : formes `["ne trouve pas", "aucune mention", "pas d'information"]` au lieu de la phrase exacte. I0 : texte étendu à l'inférence depuis la section Assistance du Résumé, formes `["rapatriement", "assistance"]`.
+- RC05 : `reponse_attendue` précise que le Résumé, propre au contrat, prime. Ajout de `points_interdits` I0 (conclut à l'absence d'écart). Les formes de O2 sont conservées : le contrôle de retrieval exige qu'une forme de chaque point obligatoire figure dans un chunk de la source attendue, donc des formes de réponse comme « écart » le feraient échouer.
+- RC01 : inchangée (`chiffre_precis` interdit les points `juge`, donc pas d'interdit supplémentaire).
+
+**Les baselines v2 (`ddfd3583dae4`) ne sont plus comparables à v3 sur RC02 à RC05** : le changement de score vient de la spécification, pas du système. Aucun run n'a été lancé sur v3 : il n'y a pas encore de baseline v3.
 
 ## Réorganisation (2026-10-13)
 
