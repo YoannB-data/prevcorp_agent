@@ -38,7 +38,7 @@ L'utilisateur (ou un appel programmatique) fournit :
 
 - `type` : un des 3 types ci-dessus
 - `contrat_id` ou `segment_nom` : selon le type (résumé → contrat_id ; notice_ccn → segment_nom ; règlement → aucun ; **FAQ → toujours `prevcorp`, identifiant fixe** — un seul fichier FAQ existe dans tout le corpus, cf. plan type FAQ)
-- `contenu_a_couvrir` : la ou les questions de l'eval set (`rag_questions_v0_25.yml`) que ce
+- `contenu_a_couvrir` : la ou les questions de l'eval set (`evals/rag/eval_set.yml`) que ce
   document doit permettre de résoudre — c'est ce qui pilote le contenu, pas l'inverse
   (cf. décision Phase 3 remaniée : le corpus est généré après les questions)
 - `est_distracteur` : booléen — si vrai, le document doit ressembler structurellement à un
@@ -49,7 +49,7 @@ L'utilisateur (ou un appel programmatique) fournit :
 1. Lire le plan type de référence pour le `type` demandé.
 2. Vérifier que `contenu_a_couvrir` est cohérent avec le type (ex : un résumé de garanties
    ne peut pas répondre à une question de processus administratif — rediriger vers FAQ).
-   **Si aucune question de `rag_questions_v0_25.yml` ne correspond au sujet demandé,
+   **Si aucune question de `evals/rag/eval_set.yml` ne correspond au sujet demandé,
    s'arrêter et le signaler avant de générer** — ne jamais rédiger un document "à partir
    du plan type, sans question cible". Un corpus généré sans ancrage éval reproduit le
    blocage diagnostiqué en Phase 3 remaniée (prose générique, rien à mesurer). Demander à
