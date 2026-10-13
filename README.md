@@ -96,7 +96,7 @@ Pour appeler directement le pipeline SQL : `from src.structured.sql_agent import
 
 ### Index RAG
 
-L'index Qdrant (`qdrant_storage/`) n'est pas reconstruit automatiquement quand `corpus/` change :
+L'index Qdrant (`qdrant_storage/`) n'est pas reconstruit automatiquement quand `data/corpus/pdf/` change :
 
 ```bash
 uv run python -m src.rag.ingestion [--variant none|prefix] [--recreate]
@@ -173,8 +173,9 @@ evals/
     CHANGELOG.md         # Versions et hashes des jeux de questions
     reports/             # Rapports Markdown (baselines/ versionné)
   reports/latest.json  # Dernier score SQL, lu par la sidebar Streamlit
-corpus/                # PDF du corpus (gitignorés, dérivés de corpus_src/)
-corpus_src/            # Sources HTML du corpus, versionnées
+data/corpus/
+  src/                 # Sources HTML du corpus, versionnées
+  pdf/                 # PDF du corpus (gitignorés, dérivés de src/)
 qdrant_storage/        # Collection Qdrant locale
 scripts/               # dump_chunks.py (lecture des chunks Qdrant)
 logs/

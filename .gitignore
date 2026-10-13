@@ -3,8 +3,7 @@
 .pytest_cache/
 .ruff_cache/
 .venv/
-corpus/.old/
-corpus/*.pdf
+data/corpus/pdf/
 qdrant_storage/
 __pycache__/
 evals/reports/*

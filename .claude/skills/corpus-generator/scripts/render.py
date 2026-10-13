@@ -73,13 +73,16 @@ def _render_with_edge_fallback(html_path: Path, output_path: Path) -> None:
 
 
 def render(
-    html_path: Path, doc_type: str, identifiant: str, corpus_dir: Path = Path("corpus")
+    html_path: Path,
+    doc_type: str,
+    identifiant: str,
+    corpus_dir: Path = Path("data/corpus/pdf"),
 ) -> Path:
     """Convertit un fichier HTML en PDF et l'écrit dans le corpus avec le nom conventionnel."""
 
     corpus_dir.mkdir(
-        exist_ok=True
-    )  # Guard - le dossier corpus/ peut ne pas exister au premier lancement
+        parents=True, exist_ok=True
+    )  # Guard - data/corpus/pdf/ peut ne pas exister au premier lancement
     output_path = corpus_dir / build_filename(doc_type, identifiant)
 
     if _weasyprint_available():

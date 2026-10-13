@@ -135,9 +135,9 @@ def test_message_cite_l_id_une_seule_fois(tmp_path):
 
 
 def test_fichier_reel_respecte_le_contrat():
-    pdfs = list((ROOT / "corpus").glob("*.pdf"))
+    pdfs = list((ROOT / "data" / "corpus" / "pdf").glob("*.pdf"))
     if not pdfs:
-        pytest.skip("corpus/ absent ou vide (gitignoré)")
+        pytest.skip("data/corpus/pdf/ absent ou vide (gitignoré)")
     valid = {p.stem for p in pdfs}
     questions = load_questions(ROOT / "evals" / "rag" / "eval_set.yml", valid)
     assert len(questions) == 25

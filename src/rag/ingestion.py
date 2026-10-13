@@ -25,7 +25,7 @@ from src.rag.pdf_text import extract_text
 
 load_dotenv()
 
-CORPUS_DIR = Path(__file__).parent.parent.parent / "corpus"
+CORPUS_DIR = Path(__file__).parent.parent.parent / "data" / "corpus" / "pdf"
 QDRANT_PATH = Path(__file__).parent.parent.parent / "qdrant_storage"
 COLLECTION_NAME = "prevcorp_docs"
 EMBEDDING_MODEL = "voyage-multilingual-2"

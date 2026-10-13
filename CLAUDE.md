@@ -77,8 +77,9 @@ evals/
     reports/              # Rapports par run (gitignored) + baselines/ (committed)
   reports/
     latest.json           # Dernier score SQL, lu par la sidebar Streamlit (seul fichier de ce dossier)
-corpus/                # Generated PDFs (chunked for the RAG index) — gitignored, derivable from corpus_src/*.html via render.py; never the source of truth
-corpus_src/            # HTML source of each corpus document, committed to git — the real content asset (LLM-generated, non-deterministic), since eval questions reference exact values inside it
+data/corpus/
+  src/                 # HTML source of each corpus document, committed to git — the real content asset (LLM-generated, non-deterministic), since eval questions reference exact values inside it
+  pdf/                 # Generated PDFs (chunked for the RAG index) — gitignored, derivable from src/*.html via render.py; never the source of truth
 scripts/               # dump_chunks.py (read-only Qdrant chunk viewer); render.py lives in .claude/skills/corpus-generator/scripts/, not here
 qdrant_storage/        # Local (embedded) Qdrant collection, populated by src/rag/ingestion.py
 logs/
@@ -103,11 +104,11 @@ logs/
 - `agent_main` accepts an optional `eval_question_id` for traceability in the JSONL log.
 - `LOGS_JSONL_PATH` (`logs/interactions.jsonl`) is relative to CWD — always launch from the project root.
 - `duckdb_executor.py` opens DuckDB in **read-only mode**; any write attempt raises an error at the DB level.
-- The RAG index (`qdrant_storage/`) is a local embedded Qdrant collection built by running `src/rag/ingestion.py` directly (`ingest_corpus()`); it is not rebuilt automatically when `corpus/` changes. Point IDs are deterministic hashes of `filename_chunkindex`, so re-ingestion is idempotent.
+- The RAG index (`qdrant_storage/`) is a local embedded Qdrant collection built by running `src/rag/ingestion.py` directly (`ingest_corpus()`); it is not rebuilt automatically when `data/corpus/pdf/` changes. Point IDs are deterministic hashes of `filename_chunkindex`, so re-ingestion is idempotent.
 - `qdrant_client.query_points()` is the current API — `.search()` is deprecated as of qdrant-client 1.18 and removed in later versions. `retriever.py` already uses `query_points()`; don't regress to `.search()` when refactoring.
 - `doc_id` is the stable key of a corpus document (stored in each chunk payload). `retrieve()` raises `ValueError` if a chunk has no `doc_id`: the collection was ingested before `doc_id` existed and must be re-ingested (`src/rag/ingestion.py`).
 - On process exit, Python may print `ImportError: sys.meta_path is None` originating from `portalocker` during `QdrantClient` garbage collection. This is cosmetic (an interpreter-shutdown artifact of the local/embedded Qdrant client) — ignore it, it does not indicate a real failure.
-- The `corpus-generator` skill (`.claude/skills/corpus-generator/`) internally calls `.claude/skills/corpus-generator/scripts/render.py`, which converts HTML to PDF via weasyprint and writes it to `corpus/` as `<TYPE>_<identifiant>.pdf` (prefix mapping in `_TYPE_PREFIXES`). If a generated PDF has an inconsistent name or lands in the wrong place, the bug is most likely in `build_filename()` or in the `corpus_dir` path passed to the script — not in the skill itself.
+- The `corpus-generator` skill (`.claude/skills/corpus-generator/`) internally calls `.claude/skills/corpus-generator/scripts/render.py`, which converts HTML to PDF via weasyprint and writes it to `data/corpus/pdf/` as `<TYPE>_<identifiant>.pdf` (prefix mapping in `_TYPE_PREFIXES`). If a generated PDF has an inconsistent name or lands in the wrong place, the bug is most likely in `build_filename()` or in the `corpus_dir` path passed to the script — not in the skill itself.
 - **Standing environment constraint, not a temporary fix**: on this machine, GTK3 cannot be installed, so `render.py` cannot use weasyprint directly — same category of constraint as the Qdrant local-mode decision above (corporate environment limits the ideal setup). `render.py` should detect the missing GTK3 dependency and fall back automatically to a headless-browser print-to-pdf (e.g. `msedge --headless --print-to-pdf=<out>.pdf <in>.html`) rather than relying on manually re-instructing each session to do so. The two engines (WeasyPrint vs. Chromium) don't guarantee identical rendering of table borders, page breaks, or column widths — spot-check a generated PDF visually after implementing the fallback, and note the standing constraint here rather than re-discovering it each session.
 
 ## Database Schema
