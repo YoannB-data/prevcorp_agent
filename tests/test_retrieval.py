@@ -1,8 +1,8 @@
 """Tests du contrôle de retrieval au niveau document et chunk."""
 
-from src.rag.eval_schema import RagQuestion
 from src.rag.evaluation.models import RetrievedChunk
 from src.rag.evaluation.retrieval import check_retrieval
+from src.rag.evaluation.schema import RagQuestion
 
 
 def _question():

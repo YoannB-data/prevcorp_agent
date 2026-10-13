@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src.rag.eval_schema import load_questions
+from src.rag.evaluation.schema import load_questions
 
 ROOT = Path(__file__).resolve().parent.parent
 VALID = {

@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import anthropic
 import pytest
 
-from src.rag.eval_schema import Point, RagQuestion
 from src.rag.evaluation.judge import AnthropicJudge, parse_verdicts
+from src.rag.evaluation.schema import Point, RagQuestion
 
 POINTS = [Point(id="O0", texte="t", formes=["f"], verif="juge")]
 

@@ -4,9 +4,9 @@ from decimal import Decimal
 
 import pytest
 
-from src.rag.eval_schema import Point, RagQuestion
 from src.rag.evaluation.models import Answer
 from src.rag.evaluation.numbers import Quantity, extract_quantities, forme_presente
+from src.rag.evaluation.schema import Point, RagQuestion
 from src.rag.evaluation.scorers import score
 
 

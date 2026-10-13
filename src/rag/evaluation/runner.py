@@ -4,7 +4,6 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
-from src.rag.eval_schema import RagQuestion, load_questions
 from src.rag.evaluation.diagnose import diagnose
 from src.rag.evaluation.judge import Judge
 from src.rag.evaluation.models import (
@@ -16,6 +15,7 @@ from src.rag.evaluation.models import (
 )
 from src.rag.evaluation.report import hash_yaml
 from src.rag.evaluation.retrieval import check_retrieval
+from src.rag.evaluation.schema import RagQuestion, load_questions
 from src.rag.evaluation.scorers import score
 
 Retrieve = Callable[[str, int], list[RetrievedChunk]]

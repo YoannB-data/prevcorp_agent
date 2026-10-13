@@ -1,9 +1,9 @@
 """Scorers par type de question : points obligatoires et points interdits."""
 
-from src.rag.eval_schema import Point, RagQuestion
 from src.rag.evaluation.judge import Judge
 from src.rag.evaluation.models import Answer, ScoreResult
 from src.rag.evaluation.numbers import forme_presente
+from src.rag.evaluation.schema import Point, RagQuestion
 
 
 def _point_present(point: Point, text: str) -> bool:
