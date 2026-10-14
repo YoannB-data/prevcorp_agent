@@ -70,7 +70,7 @@ evals/
     run_evals.py          # Eval runner: run_evals(), run_single_eval(), write_report()
     reports/              # Timestamped Markdown reports (gitignored) + baselines/ (committed)
   rag/                  # RAG pipeline evals
-    eval_set.yml          # 25 RAG eval questions (v2), validated by src/rag/evaluation/schema.py
+    eval_set.yml          # 23 RAG eval questions (v4), validated by src/rag/evaluation/schema.py
     run_evals.py          # RAG eval runner CLI (R/E/I cube)
     run_faithfulness.py   # Faithfulness maison (variante prefix uniquement ; code 2 si la collection n'est pas en prefix)
     CHANGELOG.md          # Versions et hashes des jeux de questions RAG, rapports de référence
@@ -136,7 +136,7 @@ Run evals after significant changes to `src/structured/sql_agent.py`, `src/struc
 
 ## RAG Evaluation
 
-`uv run python evals/rag/run_evals.py [--k 5] [--variant none] [--ids RC01 ...]` rejoue les questions de `evals/rag/eval_set.yml` (v2 ; versions et hashes dans `evals/rag/CHANGELOG.md` ; package `src/rag/evaluation/`). Chaque question est évaluée trois fois : retrieval (R, au niveau chunk : sources attendues dans le top-k ET formes des `points_obligatoires` dans un chunk d'une source attendue), end-to-end (E) et génération isolée (I, contexte = document entier de `contexte_effectif`). `diagnose()` croise R/E/I (`sans_reponse` : R = N/A). Rapport par run dans `evals/rag/reports/` (ignoré par git, sauf `baselines/`), un fichier nommé date + variante + hash du YAML.
+`uv run python evals/rag/run_evals.py [--k 5] [--variant none] [--ids RC01 ...]` rejoue les questions de `evals/rag/eval_set.yml` (v4, 23 questions ; versions et hashes dans `evals/rag/CHANGELOG.md` ; package `src/rag/evaluation/`). Chaque question est évaluée trois fois : retrieval (R, au niveau chunk : sources attendues dans le top-k ET formes des `points_obligatoires` dans un chunk d'une source attendue), end-to-end (E) et génération isolée (I, contexte = document entier de `contexte_effectif`). `diagnose()` croise R/E/I (`sans_reponse` : R = N/A). Rapport par run dans `evals/rag/reports/` (ignoré par git, sauf `baselines/`), un fichier nommé date + variante + hash du YAML.
 
 - Points `deterministe` : extraction par regex (`numbers.py`), jamais de LLM ni d'embeddings ; `chiffre_precis` interdit `verif: juge`. Points `juge` : un LLM coche oui/non, résultat « à vérifier à la main ». Les questions « écart » (valeurs à rattacher au bon document) passent par le juge : la présence de valeurs ne détecte pas une inversion.
 - `points_interdits` est exclu du contrôle de présence dans les chunks : ce sont des formulations de mauvaise source, leur absence des chunks attendus est normale.

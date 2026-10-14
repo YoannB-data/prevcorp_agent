@@ -6,7 +6,23 @@ Le hash du YAML (nom des rapports, champ « Hash du YAML ») est le sha256 des *
 |---------|---------|------|
 | v1 | `rag_questions_v1_25.yml` (supprimé du dépôt, voir Réorganisation) | `ae7aed3dcc6a` |
 | v2 | `rag_questions_v2_25.yml`, devenu `evals/rag/eval_set.yml` | `ddfd3583dae4` |
-| v3 | `evals/rag/eval_set.yml` | `f12821773e6c` |
+| v3 | `evals/rag/eval_set.yml` (jamais rejoué) | `f12821773e6c` |
+| v4 | `evals/rag/eval_set.yml` | `938200a6916b` |
+
+## v4 (2026-10-14)
+
+23 questions (RC01 et RC21 supprimées, ids non renumérotés). Motif : revue complète des 25 questions par le subagent `eval-reviewer` (`evals/rag/reviews/review_v3.md`). Cumule les corrections v3 (RC02 à RC05), jamais rejouées seules.
+
+- RC01 et RC21 supprimées : non discriminantes (valeur dominante du corpus ; connaissance générale de la Sécurité sociale).
+- RC02 : O0 en `verif: juge` (« 3 mois » matche aussi l'ancienneté de 3 mois).
+- RC05 : retrait de « Le Résumé, propre au contrat, prime » (absent des sources).
+- RC09, RC10, RC13, RC22, RC24 : questions reformulées (ambiguïté ou choix binaire). RC24 : point O2 (majoration par enfant) retiré, la question vise un assuré sans enfant.
+- RC11 : prémisse « régime par défaut du Règlement » retirée (l'art. 14 décrit deux modalités sans défaut). `sources_attendues` inchangées : R exige toutes les sources attendues, y ajouter le Résumé durcirait le retrieval.
+- RC19 : `croisement` → `fait_simple`, source `RESUME_C20077` seule ; point O2 retiré.
+- RC20 : bascule sur la 2e catégorie (75 % sur C20077 contre 100 % de base, art. 15).
+- RC23 : « Selon la FAQ, » ajouté à la question.
+
+Run de référence : `rag_20261014_111113_prefix_938200a6916b.md` (prefix, k=5) : R 15/21, E 19/23, I 22/23. Baseline précédente comparable : le run prefix `ddfd3583dae4` (v2, R 16/23, E 18/25, I 23/25), faute de run v3. Verdicts qui changent : RC11 (E KO→OK), RC19 (R KO→OK), RC22 (E KO→OK), plus la disparition de RC01 et RC21. RC11, RC19 et RC22 ont été reformulées : leur changement vient de la spécification, pas du système.
 
 ## v3 (2026-10-13)
 
@@ -67,6 +83,7 @@ Format modifié le 9/10/2026 : le rapport liste désormais toutes les affirmatio
 | `rag_20261009_112048_prefix_ddfd3583dae4.md` | `ddfd3583dae4` (v2) | prefix | 5 |
 | `faithfulness_20261009_140338_prefix_ddfd3583dae4_partial.md` | `ddfd3583dae4` (v2) | prefix | 5 (partiel : RC17, RC20, RC24, RC25) |
 | `rag_20261009_113428_none_ddfd3583dae4.md` | `ddfd3583dae4` (v2) | none | 5 |
+| `rag_20261014_111113_prefix_938200a6916b.md` | `938200a6916b` (v4) | prefix | 5 |
 
 ## Dette connue
 
