@@ -7,7 +7,7 @@ Le hash du YAML (nom des rapports, champ « Hash du YAML ») est le sha256 des *
 | v1 | `rag_questions_v1_25.yml` (supprimé du dépôt, voir Réorganisation) | `ae7aed3dcc6a` |
 | v2 | `rag_questions_v2_25.yml`, devenu `evals/rag/eval_set.yml` | `ddfd3583dae4` |
 | v3 | `evals/rag/eval_set.yml` (jamais rejoué) | `f12821773e6c` |
-| v4 | `evals/rag/eval_set.yml` | `938200a6916b` |
+| v4 | `evals/rag/eval_set.yml` | `2bd3dc85629a` (`938200a6916b` avant le remplacement de l'en-tête) |
 
 ## v4 (2026-10-14)
 
@@ -21,6 +21,8 @@ Le hash du YAML (nom des rapports, champ « Hash du YAML ») est le sha256 des *
 - RC19 : `croisement` → `fait_simple`, source `RESUME_C20077` seule ; point O2 retiré.
 - RC20 : bascule sur la 2e catégorie (75 % sur C20077 contre 100 % de base, art. 15).
 - RC23 : « Selon la FAQ, » ajouté à la question.
+
+L'en-tête du YAML a été remplacé après ce run (commentaires seuls, aucune question modifiée) : le hash `938200a6916b` correspond au contenu du fichier avant ce commit, et le fichier actuel a le hash `2bd3dc85629a`, sans run associé.
 
 Run de référence : `rag_20261014_111113_prefix_938200a6916b.md` (prefix, k=5) : R 15/21, E 19/23, I 22/23. Baseline précédente comparable : le run prefix `ddfd3583dae4` (v2, R 16/23, E 18/25, I 23/25), faute de run v3. Verdicts qui changent : RC11 (E KO→OK), RC19 (R KO→OK), RC22 (E KO→OK), plus la disparition de RC01 et RC21. RC11, RC19 et RC22 ont été reformulées : leur changement vient de la spécification, pas du système.
 
@@ -58,6 +60,8 @@ Les 21 autres questions sont inchangées. Le changement de score entre v1 et v2 
 ## v1 (2026-10-06)
 
 Remplace v0 : `sources_attendues` en liste de `doc_id`, `contexte_isole` optionnel, `points_obligatoires` et `points_interdits` renseignés pour les 25 questions.
+
+Deux questions réécrites par rapport à v0 : RC25 (réponse réécrite : conjoint, puis enfants, puis héritiers ; la Notice s'applique) et RC08 (rente éducation retirée de la réponse, couverte par RC09). Ces deux mentions figuraient dans l'ancien en-tête du YAML, remplacé en v4.
 
 Hashes de v1 :
 - `66873617cdfb` : v1 avant correction de l'O0 de RC04 et RC17. Les rapports portant ce hash ne sont pas à utiliser.

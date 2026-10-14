@@ -1,12 +1,10 @@
-# Livrable 3.1 — 25 questions cibles pour le corpus RAG PrevCorp (v1)
-# Changements vs v0 :
-#   - sources_attendues = liste de doc_id (nom de fichier sans extension), plus de texte libre
+# Eval set RAG PrevCorp — v4, 23 questions (ids RC01 et RC21 supprimés, non renumérotés)
+# Historique des versions : evals/rag/CHANGELOG.md
+#
+# Conventions :
+#   - sources_attendues = liste de doc_id (nom de fichier sans extension) ; R exige TOUTES les sources
 #   - sources_attendues: [] pour les questions sans_reponse (retrieval = N/A)
-#   - contexte_isole : champ OPTIONNEL, présent uniquement quand il diverge de sources_attendues
-#     (défaut = sources_attendues). Utilisé par le run génération isolée.
-#   - RC25 : réponse réécrite (conjoint, puis enfants, puis héritiers ; la Notice s'applique)
-#   - RC08 : rente éducation retirée de la réponse (couverte par RC09)
-#   - v4 : corrections de la revue eval-reviewer v3 (RC01 et RC21 supprimées, ids non renumérotés)
+#   - contexte_isole : optionnel, présent seulement s'il diverge de sources_attendues (run génération isolée)
 #
 # Contrats-ancres partie 1 : C87656 (CADRE, Santé et action sociale) / C83792 (ENSEMBLE DU PERSONNEL, Enseignement privé) / C39949 (NON CADRE, Agriculture)
 # Contrats-ancres partie 2 : C73736 (Métallurgie, CADRE) / C20077 (Transport routier, NON CADRE)
