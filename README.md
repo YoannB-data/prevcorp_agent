@@ -96,7 +96,7 @@ Pour appeler directement le pipeline SQL : `from src.structured.sql_agent import
 
 ### Index RAG
 
-L'index Qdrant (`qdrant_storage/`) n'est pas reconstruit automatiquement quand `corpus/` change :
+L'index Qdrant (`qdrant_storage/`) n'est pas reconstruit automatiquement quand `data/corpus/pdf/` change :
 
 ```bash
 uv run python -m src.rag.ingestion [--variant none|prefix] [--recreate]
@@ -107,21 +107,21 @@ uv run python -m src.rag.ingestion [--variant none|prefix] [--recreate]
 ### SQL
 
 ```bash
-uv run python evals/run_evals.py                 # suite complète
-uv run python evals/run_evals.py --ids Q012 Q034 # questions spécifiques
+uv run python evals/sql/run_evals.py                 # suite complète
+uv run python evals/sql/run_evals.py --ids Q012 Q034 # questions spécifiques
 ```
 
-Les résultats sont écrits dans `evals/reports/` (Markdown horodaté) et `evals/reports/latest.json` (lu par la sidebar Streamlit, écrit uniquement sur un run complet).
+Les résultats sont écrits dans `evals/sql/reports/` (Markdown horodaté) et `evals/reports/latest.json` (lu par la sidebar Streamlit, écrit uniquement sur un run complet).
 
 ### RAG
 
 ```bash
-uv run python evals/run_rag_evals.py [--k 5] [--variant none] [--ids RC01 ...]
+uv run python evals/rag/run_evals.py [--k 5] [--variant none] [--ids RC01 ...]
 ```
 
-Chaque question de `evals/rag_questions_v1_25.yml` est évaluée en retrieval (R), de bout en bout (E) et en génération isolée (I). Rapports dans `evals/reports/rag/`. Ne pas lancer pendant que Streamlit tourne (verrou disque Qdrant) ; les appels Voyage et Anthropic sont facturés.
+Chaque question de `evals/rag/eval_set.yml` est évaluée en retrieval (R), de bout en bout (E) et en génération isolée (I). Rapports dans `evals/rag/reports/`. Ne pas lancer pendant que Streamlit tourne (verrou disque Qdrant) ; les appels Voyage et Anthropic sont facturés.
 
-Historique des jeux de questions RAG et de leurs hashes : [evals/CHANGELOG.md](evals/CHANGELOG.md).
+Historique des jeux de questions RAG et de leurs hashes : [evals/rag/CHANGELOG.md](evals/rag/CHANGELOG.md).
 
 ## Harnais de développement (Claude Code)
 
@@ -157,19 +157,25 @@ src/
     generator.py         # Chunks + question → réponse citée
     pdf_text.py          # Extraction du texte des PDF
     metadata.py          # Métadonnées des documents (doc_id, doc_type)
-    eval_schema.py       # Schéma du YAML d'éval RAG
-    evaluation/          # Runner d'éval RAG (retrieval, scorers, juge, faithfulness, diagnose, rapport)
+    evaluation/          # Runner d'éval RAG (schéma du YAML, retrieval, scorers, juge, faithfulness, diagnose, rapport)
   prompts/
     system_prompt.md   # Prompt système injecté dans chaque appel
     few_shot_bank.yml  # Banque d'exemples few-shot
 evals/
-  eval_set.yml         # Questions avec SQL de référence et mode de comparaison
-  run_evals.py         # Runner d'évaluation SQL
-  rag_questions_v1_25.yml # 25 questions d'éval RAG
-  run_rag_evals.py     # Runner d'évaluation RAG
-  reports/             # Rapports Markdown + latest.json (rag/ pour le RAG)
-corpus/                # PDF du corpus (gitignorés, dérivés de corpus_src/)
-corpus_src/            # Sources HTML du corpus, versionnées
+  sql/                 # Éval du pipeline SQL
+    eval_set.yml         # Questions avec SQL de référence et mode de comparaison
+    run_evals.py         # Runner d'évaluation SQL
+    reports/             # Rapports Markdown (baselines/ versionné)
+  rag/                 # Éval du pipeline RAG
+    eval_set.yml         # 25 questions d'éval RAG
+    run_evals.py         # Runner d'évaluation RAG
+    run_faithfulness.py  # Faithfulness (variante prefix)
+    CHANGELOG.md         # Versions et hashes des jeux de questions
+    reports/             # Rapports Markdown (baselines/ versionné)
+  reports/latest.json  # Dernier score SQL, lu par la sidebar Streamlit
+data/corpus/
+  src/                 # Sources HTML du corpus, versionnées
+  pdf/                 # PDF du corpus (gitignorés, dérivés de src/)
 qdrant_storage/        # Collection Qdrant locale
 scripts/               # dump_chunks.py (lecture des chunks Qdrant)
 logs/

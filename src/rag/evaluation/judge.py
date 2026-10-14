@@ -6,7 +6,7 @@ from typing import Protocol
 
 import anthropic
 
-from src.rag.eval_schema import Point, RagQuestion
+from src.rag.evaluation.schema import Point, RagQuestion
 
 JUDGE_MAX_TOKENS = 512
 

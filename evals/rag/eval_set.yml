@@ -1,52 +1,37 @@
-# Livrable 3.1 — 25 questions cibles pour le corpus RAG PrevCorp (v1)
-# Changements vs v0 :
-#   - sources_attendues = liste de doc_id (nom de fichier sans extension), plus de texte libre
+# Eval set RAG PrevCorp — v4, 23 questions (ids RC01 et RC21 supprimés, non renumérotés)
+# Historique des versions : evals/rag/CHANGELOG.md
+#
+# Conventions :
+#   - sources_attendues = liste de doc_id (nom de fichier sans extension) ; R exige TOUTES les sources
 #   - sources_attendues: [] pour les questions sans_reponse (retrieval = N/A)
-#   - contexte_isole : champ OPTIONNEL, présent uniquement quand il diverge de sources_attendues
-#     (défaut = sources_attendues). Utilisé par le run génération isolée.
-#   - RC25 : réponse réécrite (conjoint, puis enfants, puis héritiers ; la Notice s'applique)
-#   - RC08 : rente éducation retirée de la réponse (couverte par RC09)
+#   - contexte_isole : optionnel, présent seulement s'il diverge de sources_attendues (run génération isolée)
 #
 # Contrats-ancres partie 1 : C87656 (CADRE, Santé et action sociale) / C83792 (ENSEMBLE DU PERSONNEL, Enseignement privé) / C39949 (NON CADRE, Agriculture)
 # Contrats-ancres partie 2 : C73736 (Métallurgie, CADRE) / C20077 (Transport routier, NON CADRE)
 
 questions:
 
-  - id: RC01
-    question: "Quel est le délai de franchise de la garantie Incapacité Temporaire de Travail du contrat C87656 ?"
-    type: chiffre_precis
-    contrat_cible: C87656
-    reponse_attendue: "90 jours"
-    sources_attendues: [RESUME_C87656]
-    corpus_a_contenir: "Résumé C87656 : ligne garantie ITT, franchise = 90 jours"
-    points_obligatoires:
-      - id: O0
-        texte: "Franchise ITT de 90 jours"
-        formes: ["90 jours"]
-        verif: deterministe
-    points_interdits:
-      - id: I0
-        texte: "Franchise de 60 jours (autre contrat)"
-        formes: ["60 jours"]
-        verif: deterministe
-
   - id: RC02
     question: "Le contrat C87656 prévoit-il un délai de carence avant la prise d'effet de la garantie ITT, et si oui lequel ?"
-    type: croisement
+    type: fait_simple
     contrat_cible: C87656
     reponse_attendue: "Oui, 3 mois"
-    sources_attendues: [REGLEMENT_prevcorp, RESUME_C87656]
+    sources_attendues: [RESUME_C87656]
     corpus_a_contenir: >
-      Règlement : article définissant le principe de carence.
       Résumé C87656 : ligne garantie ITT avec délai de carence = 3 mois.
     points_obligatoires:
       - id: O0
         texte: "Un délai de carence de 3 mois s'applique avant la prise d'effet de l'ITT"
         formes: ["3 mois"]
-        verif: deterministe
+        verif: juge
       - id: O1
         texte: "La réponse confirme qu'il existe bien un délai de carence"
         formes: ["délai de carence"]
+        verif: juge
+    points_interdits:
+      - id: I0
+        texte: "La réponse confond avec le jour de carence de la Sécurité sociale ou avec la franchise de 90 jours"
+        formes: ["jour de carence", "90 jours"]
         verif: juge
 
   - id: RC03
@@ -55,19 +40,19 @@ questions:
     contrat_cible: C87656
     reponse_attendue: >
       Oui selon la Notice CCN Santé et action sociale (concubin inclus sous condition de résidence commune),
-      alors que le Règlement générique ne le mentionne pas — écart délibéré entre les deux documents.
+      alors que la clause bénéficiaire type du Règlement générique ne le liste pas — écart délibéré entre les deux documents.
     sources_attendues: [REGLEMENT_prevcorp, NOTICE_CCN_sante_action_sociale]
     corpus_a_contenir: >
-      Règlement : clause bénéficiaire type = conjoint ou pacsé, à défaut enfants, à défaut parents, à défaut ascendants, à défaut héritiers (pas de mention du concubin).
+      Règlement : clause bénéficiaire type = conjoint ou partenaire de PACS, à défaut enfants, à défaut parents, à défaut ascendants, à défaut héritiers (concubin absent de la clause ; il n'apparaît que dans le tableau des justificatifs).
       Notice CCN Santé et action sociale : même clause + concubin sous condition de résidence commune — écart délibéré à injecter.
     points_obligatoires:
       - id: O0
         texte: "La Notice CCN Santé et action sociale inclut le concubin, sous condition de résidence commune"
-        formes: ["concubin"]
+        formes: ["concubin", "résidence commune"]
         verif: juge
       - id: O1
-        texte: "Le Règlement générique ne mentionne pas le concubin : écart entre les deux documents"
-        formes: ["conjoint"]
+        texte: "La clause bénéficiaire type du Règlement générique ne liste pas le concubin (conjoint ou partenaire de PACS uniquement) : écart entre les deux documents"
+        formes: ["pacte civil de solidarité"]
         verif: juge
 
   - id: RC04
@@ -81,12 +66,12 @@ questions:
     points_obligatoires:
       - id: O0
         texte: "La réponse indique que l'information n'est pas disponible dans les documents"
-        formes: ["Je ne trouve pas cette information dans les documents disponibles"]
+        formes: ["ne trouve pas", "aucune mention", "pas d'information"]
         verif: juge
     points_interdits:
       - id: I0
-        texte: "La réponse affirme que le contrat C39949 couvre le rapatriement à l'étranger"
-        formes: ["rapatriement"]
+        texte: "La réponse affirme que le contrat C39949 couvre le rapatriement à l'étranger, ou l'infère de la section Assistance du Résumé"
+        formes: ["rapatriement", "assistance"]
         verif: juge
 
   - id: RC05
@@ -109,14 +94,19 @@ questions:
         texte: "La réponse conclut à un écart entre le Résumé et la Notice"
         formes: ["60 jours", "90 jours"]
         verif: juge
+    points_interdits:
+      - id: I0
+        texte: "La réponse conclut à l'absence d'écart entre le Résumé et la Notice"
+        formes: ["aucun écart", "pas d'écart"]
+        verif: juge
 
   - id: RC06
     question: "Quel est le taux de couverture de l'invalidité sur le contrat C39949, pour les 3 catégories ?"
-    type: croisement
+    type: fait_simple
     contrat_cible: C39949
     reponse_attendue: "Invalidité 1re catégorie : 35 % (tranches A et B) et 25 % (tranche C) ; 2e catégorie : 45 % (A et B) et 35 % (C) ; 3e catégorie : 70 % (A et B) et 55 % (C) du salaire annuel brut de référence."
-    sources_attendues: [REGLEMENT_prevcorp, RESUME_C39949]
-    corpus_a_contenir: "Règlement : définition des 3 catégories d'invalidité. Résumé C39949 : taux de couverture par catégorie."
+    sources_attendues: [RESUME_C39949]
+    corpus_a_contenir: "Résumé C39949 : taux de couverture par catégorie."
     points_obligatoires:
       - id: O0
         texte: "Invalidité 1re catégorie : 35 % en tranches A et B, 25 % en tranche C"
@@ -133,11 +123,11 @@ questions:
 
   - id: RC07
     question: "Quel est le taux de couverture de l'incapacité sur le contrat C87656, et la franchise associée ?"
-    type: croisement
+    type: fait_simple
     contrat_cible: C87656
     reponse_attendue: "Indemnité journalière de 82 % du salaire de référence en tranche A et 78 % en tranche B, après une franchise contractuelle de 90 jours."
-    sources_attendues: [REGLEMENT_prevcorp, RESUME_C87656]
-    corpus_a_contenir: "Règlement : définition de la garantie incapacité. Résumé C87656 : taux de couverture ITT + jours de franchise."
+    sources_attendues: [RESUME_C87656]
+    corpus_a_contenir: "Résumé C87656 : taux de couverture ITT + jours de franchise."
     points_obligatoires:
       - id: O0
         texte: "Indemnité journalière de 82 % en tranche A"
@@ -190,10 +180,10 @@ questions:
         verif: deterministe
 
   - id: RC09
-    question: "Une rente éducation est-elle prévue sur le contrat C83792 ?"
+    question: "Quels sont les taux de la rente éducation du contrat C83792 ?"
     type: chiffre_precis
     contrat_cible: C83792
-    reponse_attendue: "Oui. Rente éducation annuelle versée jusqu'à la fin des études et au plus tard au 26e anniversaire : 5,5 % jusqu'à 11 ans, 8 % de 12 à 17 ans, 11 % de 18 à 25 ans (études ou apprentissage)."
+    reponse_attendue: "Rente éducation annuelle versée jusqu'à la fin des études et au plus tard au 26e anniversaire : 5,5 % jusqu'à 11 ans, 8 % de 12 à 17 ans, 11 % de 18 à 25 ans (études ou apprentissage)."
     sources_attendues: [RESUME_C83792]
     corpus_a_contenir: "Résumé C83792 : table de la rente éducation."
     points_obligatoires:
@@ -215,12 +205,12 @@ questions:
         verif: deterministe
 
   - id: RC10
-    question: "Y a-t-il des garanties optionnelles disponibles sur le contrat C87656 ?"
-    type: croisement
+    question: "Quelles garanties optionnelles sont souscrites sur le contrat C87656 ?"
+    type: fait_simple
     contrat_cible: C87656
-    reponse_attendue: "Oui, deux garanties optionnelles souscrites sur C87656 : la rente de conjoint (15 % en tranche A et en tranche B) et la garantie obsèques (capital forfaitaire de 2 500 €)."
-    sources_attendues: [REGLEMENT_prevcorp, RESUME_C87656]
-    corpus_a_contenir: "Règlement : catalogue des garanties optionnelles possibles. Résumé C87656 : lesquelles sont effectivement souscrites."
+    reponse_attendue: "Deux garanties optionnelles souscrites sur C87656 : la rente de conjoint (15 % en tranche A et en tranche B) et la garantie obsèques (capital forfaitaire de 2 500 €)."
+    sources_attendues: [RESUME_C87656]
+    corpus_a_contenir: "Résumé C87656 : garanties optionnelles effectivement souscrites."
     points_obligatoires:
       - id: O0
         texte: "La rente de conjoint est souscrite"
@@ -236,19 +226,19 @@ questions:
         verif: deterministe
 
   - id: RC11
-    question: "Le contrat C73736 prévoit-il une franchise continue ou discontinue pour la garantie Incapacité Temporaire de Travail, et cela correspond-il au régime par défaut du Règlement ou à une dérogation CCN ?"
+    question: "Quelle modalité de franchise (continue ou discontinue) s'applique à la garantie Incapacité Temporaire de Travail du contrat C73736, et la CCN y déroge-t-elle ?"
     type: croisement
     contrat_cible: C73736
-    reponse_attendue: "Franchise continue (le délai de 90 jours court sans interruption dès le premier jour d'arrêt). C'est le régime de base de la convention : la Notice CCN Métallurgie précise qu'elle ne prévoit aucune dérogation à cette modalité."
+    reponse_attendue: "Franchise continue (le délai de 90 jours court sans interruption dès le premier jour d'arrêt). La Notice CCN Métallurgie précise qu'elle ne prévoit aucune dérogation à cette modalité."
     sources_attendues: [REGLEMENT_prevcorp, NOTICE_CCN_metallurgie]
-    corpus_a_contenir: "Règlement : définit les deux types de franchise (continue/discontinue). Notice CCN Métallurgie : précise le type retenu pour C73736."
+    corpus_a_contenir: "Règlement : définit les deux modalités de franchise (continue/discontinue), sans régime par défaut. Notice CCN Métallurgie : précise le type retenu pour C73736 et l'absence de dérogation. Résumé C73736 : franchise continue."
     points_obligatoires:
       - id: O0
         texte: "La franchise est continue : le délai de 90 jours court sans interruption dès le premier jour d'arrêt"
         formes: ["continue"]
         verif: juge
       - id: O1
-        texte: "C'est le régime de base : la Notice CCN Métallurgie ne prévoit aucune dérogation"
+        texte: "La Notice CCN Métallurgie ne prévoit aucune dérogation à cette modalité"
         formes: ["dérogation"]
         verif: juge
     points_interdits:
@@ -271,7 +261,7 @@ questions:
         verif: deterministe
 
   - id: RC13
-    question: "Le contrat C73736 applique-t-il la clause bénéficiaire type (conjoint puis enfants puis héritiers) ou une clause personnalisée déclarée à l'assureur ? Si personnalisée, quelle répartition ?"
+    question: "Le contrat C73736 applique-t-il la clause bénéficiaire type (conjoint ou partenaire de PACS, enfants, parents, autres ascendants, héritiers) ou une clause personnalisée déclarée à l'assureur ? Si personnalisée, quelle répartition ?"
     type: croisement
     contrat_cible: C73736
     reponse_attendue: "Clause bénéficiaire type : aucune désignation personnalisée n'a été notifiée pour C73736, donc la clause type s'applique de plein droit, sans répartition personnalisée (conjoint ou partenaire de PACS, à défaut enfants par parts égales, à défaut parents, à défaut autres ascendants, à défaut héritiers)."
@@ -378,11 +368,11 @@ questions:
 
   - id: RC19
     question: "Le contrat C20077 applique-t-il une majoration de capital décès par enfant à charge, et à quel taux ?"
-    type: croisement
+    type: fait_simple
     contrat_cible: C20077
-    reponse_attendue: "Oui : majoration de 25 % du capital décès toutes causes par enfant à charge reconnu au jour du sinistre (tranches A et B), cumulable sans limitation de rang ; principe posé par la Notice CCN Transport routier, taux fixé par le Résumé C20077."
-    sources_attendues: [NOTICE_CCN_transport_routier, RESUME_C20077]
-    corpus_a_contenir: "Notice CCN Transport routier : mécanisme de majoration par enfant à charge. Résumé C20077 : taux appliqué."
+    reponse_attendue: "Oui : majoration de 25 % du capital décès toutes causes par enfant à charge reconnu au jour du sinistre (tranches A et B), cumulable sans limitation de rang."
+    sources_attendues: [RESUME_C20077]
+    corpus_a_contenir: "Résumé C20077 : majoration par enfant à charge (taux et cumul sans limitation de rang)."
     points_obligatoires:
       - id: O0
         texte: "Majoration de 25 % du capital décès par enfant à charge"
@@ -392,55 +382,26 @@ questions:
         texte: "Cumulable sans limitation de rang"
         formes: ["sans limitation de rang"]
         verif: juge
-      - id: O2
-        texte: "Le principe est posé par la Notice CCN Transport routier et le taux fixé par le Résumé C20077"
-        formes: ["enfant à charge"]
-        verif: juge
 
   - id: RC20
-    question: "Le taux de couverture invalidité 1re catégorie du contrat C20077 est-il le taux de base du Règlement ou une dérogation CCN ?"
+    question: "Quel est le taux de couverture invalidité 2e catégorie du contrat C20077, et diffère-t-il du taux de base du Règlement ?"
     type: croisement
     contrat_cible: C20077
-    reponse_attendue: "Taux de base : 50 % en 1re catégorie sur C20077 (tranches A et B), soit le taux de base de l'article 15 du Règlement, sans dérogation CCN."
+    reponse_attendue: "75 % en 2e catégorie sur C20077 (tranches A et B), alors que le taux de base de l'article 15 du Règlement est de 100 % : le Résumé applique un taux inférieur au taux de base."
     sources_attendues: [REGLEMENT_prevcorp, RESUME_C20077]
-    corpus_a_contenir: "Règlement : taux de base pour l'invalidité 1re catégorie. Résumé C20077 : taux effectivement appliqué, à comparer."
+    corpus_a_contenir: "Règlement art. 15 : taux de base 100 % pour les 2e et 3e catégories. Résumé C20077 : 75 % en 2e catégorie, à comparer."
     points_obligatoires:
       - id: O0
-        texte: "Invalidité 1re catégorie sur C20077 : 50 % en tranches A et B"
-        formes: ["50 %"]
+        texte: "Invalidité 2e catégorie sur C20077 : 75 % en tranches A et B"
+        formes: ["75 %"]
         verif: juge
       - id: O1
-        texte: "C'est le taux de base de l'article 15 du Règlement, sans dérogation CCN"
-        formes: ["article 15"]
-        verif: juge
-
-  - id: RC21
-    question: "Quelles sont les 3 catégories d'invalidité et comment sont-elles déterminées ?"
-    type: fait_simple
-    contrat_cible: null
-    reponse_attendue: "1re catégorie : invalides capables d'exercer une activité rémunérée ; 2e catégorie : invalides absolument incapables d'exercer une profession quelconque ; 3e catégorie : idem, avec en plus recours nécessaire à l'assistance d'une tierce personne pour les actes ordinaires de la vie. La catégorie est déterminée par le médecin conseil de la Sécurité sociale, notifiée par la CPAM puis communiquée à l'assureur."
-    sources_attendues: [FAQ_prevcorp]
-    corpus_a_contenir: "FAQ : question dédiée sur les 3 catégories d'invalidité et l'autorité qui les détermine."
-    points_obligatoires:
-      - id: O0
-        texte: "1re catégorie : invalides capables d'exercer une activité rémunérée"
-        formes: ["activité rémunérée"]
-        verif: juge
-      - id: O1
-        texte: "2e catégorie : invalides absolument incapables d'exercer une profession quelconque"
-        formes: ["profession quelconque"]
-        verif: juge
-      - id: O2
-        texte: "3e catégorie : idem, avec recours nécessaire à l'assistance d'une tierce personne"
-        formes: ["tierce personne"]
-        verif: juge
-      - id: O3
-        texte: "La catégorie est déterminée par le médecin conseil de la Sécurité sociale"
-        formes: ["médecin conseil"]
+        texte: "Le taux de base de l'article 15 du Règlement est de 100 % : le taux de C20077 est inférieur"
+        formes: ["taux de base"]
         verif: juge
 
   - id: RC22
-    question: "Le délai de prescription pour une action en incapacité de travail est-il de 2 ans ou de 5 ans sur le contrat C20077 ?"
+    question: "Quel est le délai de prescription pour une action en incapacité de travail sur le contrat C20077 ?"
     type: croisement
     contrat_cible: C20077
     reponse_attendue: "5 ans. Le Règlement fixe 2 ans par défaut, mais la Notice CCN Transport routier déroge et porte à 5 ans le délai de prescription pour la garantie incapacité de travail."
@@ -462,7 +423,7 @@ questions:
         verif: juge
 
   - id: RC23
-    question: "Que doit faire un salarié du contrat C20077 en arrêt de travail pour percevoir ses indemnités journalières, et à quel taux sont-elles versées ?"
+    question: "Selon la FAQ, que doit faire un salarié du contrat C20077 en arrêt de travail pour percevoir ses indemnités journalières, et à quel taux sont-elles versées ?"
     type: croisement
     contrat_cible: C20077
     reponse_attendue: "Transmettre l'avis d'arrêt initial (et prolongations) à l'employeur sous 48 heures ; l'employeur déclare l'arrêt à l'assureur sous 8 jours avec copie de l'avis médical et les bulletins de salaire des 3 derniers mois (espace adhérent en ligne ou courrier au service prestations). Les IJ sont versées après la franchise, au taux de 78 % en tranche A et 72 % en tranche B."
@@ -494,10 +455,10 @@ questions:
         verif: juge
 
   - id: RC24
-    question: "Sur un contrat où le concubin est reconnu bénéficiaire (ex. C87656), quel montant perçoit-il en cas de décès ?"
+    question: "Sur le contrat C87656, quel capital perçoit le concubin d'un assuré célibataire sans enfant à charge ?"
     type: croisement
     contrat_cible: C87656
-    reponse_attendue: "Le concubin est éligible selon la Notice CCN Santé et action sociale (sous condition de résidence commune au jour du décès) et perçoit le capital décès de la clause type, sans montant spécifique pour lui : les taux du Résumé C87656 s'appliquent, soit 180 % du salaire annuel brut de référence (tranches A et B) pour un assuré sans personne à charge, majoré de 25 % par enfant à charge."
+    reponse_attendue: "Le concubin est éligible selon la Notice CCN Santé et action sociale (sous condition de résidence commune au jour du décès) et perçoit le capital décès de la clause type, sans montant spécifique pour lui : les taux du Résumé C87656 s'appliquent, soit 180 % du salaire annuel brut de référence (tranches A et B) pour un assuré célibataire sans enfant à charge."
     sources_attendues: [NOTICE_CCN_sante_action_sociale, RESUME_C87656]
     corpus_a_contenir: "Réutilise l'écart déjà injecté pour RC03. Notice CCN : confirme l'éligibilité du concubin. Résumé : montant du capital."
     points_obligatoires:
@@ -509,10 +470,6 @@ questions:
         texte: "Capital de 180 % du salaire annuel brut de référence (tranches A et B) sans personne à charge"
         formes: ["180 %"]
         verif: juge
-      - id: O2
-        texte: "Majoration de 25 % par enfant à charge"
-        formes: ["25 %"]
-        verif: deterministe
 
   - id: RC25
     question: "Sur le contrat C20077, où le concubin n'est pas reconnu bénéficiaire, à qui est versé le capital décès si aucune désignation n'a été faite ?"

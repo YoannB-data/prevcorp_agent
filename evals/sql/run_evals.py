@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.structured.duckdb_executor import execute_query
 from src.structured.sql_agent import agent_main
@@ -121,7 +121,8 @@ def _write_latest_json(results: list[dict], now: datetime.datetime) -> None:
         "evaluated": evaluated,
         "score_pct": score_pct,
     }
-    path = Path(__file__).parent / "reports" / "latest.json"
+    # Reste dans evals/reports/ : chemin lu par la sidebar Streamlit (LATEST_EVAL_PATH)
+    path = Path(__file__).parent.parent / "reports" / "latest.json"
     path.write_text(__import__("json").dumps(data, indent=2), encoding="utf-8")
 
 
@@ -157,7 +158,7 @@ def run_single_eval(item: dict) -> dict:
 
 
 def write_report(results: list[dict]) -> None:
-    """Écrit le rapport d'évaluation dans evals/reports/report_YYYYMMDD_HHMMSS.md."""
+    """Écrit le rapport d'évaluation dans evals/sql/reports/report_YYYYMMDD_HHMMSS.md."""
 
     now = datetime.datetime.now()
     reports_dir = Path(__file__).parent / "reports"

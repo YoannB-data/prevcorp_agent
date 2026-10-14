@@ -1,8 +1,8 @@
 """Succès du retrieval : documents attendus ET points obligatoires retrouvés dans leurs chunks."""
 
-from src.rag.eval_schema import RagQuestion
 from src.rag.evaluation.models import RetrievalCheck, RetrievedChunk
 from src.rag.evaluation.numbers import forme_presente
+from src.rag.evaluation.schema import RagQuestion
 
 
 def check_retrieval(question: RagQuestion, chunks: list[RetrievedChunk]) -> RetrievalCheck:

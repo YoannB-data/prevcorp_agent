@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src.rag.eval_schema import load_questions
+from src.rag.evaluation.schema import load_questions
 
 ROOT = Path(__file__).resolve().parent.parent
 VALID = {
@@ -135,12 +135,12 @@ def test_message_cite_l_id_une_seule_fois(tmp_path):
 
 
 def test_fichier_reel_respecte_le_contrat():
-    pdfs = list((ROOT / "corpus").glob("*.pdf"))
+    pdfs = list((ROOT / "data" / "corpus" / "pdf").glob("*.pdf"))
     if not pdfs:
-        pytest.skip("corpus/ absent ou vide (gitignoré)")
+        pytest.skip("data/corpus/pdf/ absent ou vide (gitignoré)")
     valid = {p.stem for p in pdfs}
-    questions = load_questions(ROOT / "evals" / "rag_questions_v1_25.yml", valid)
-    assert len(questions) == 25
+    questions = load_questions(ROOT / "evals" / "rag" / "eval_set.yml", valid)
+    assert len(questions) == 23
 
 
 def test_contexte_effectif_defaut_sur_sources(tmp_path):

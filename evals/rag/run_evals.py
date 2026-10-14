@@ -4,13 +4,13 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.rag.evaluation.report import render_summary, write_report
 from src.rag.evaluation.runner import run_eval
 
-EVAL_FILE = Path(__file__).parent / "rag_questions_v1_25.yml"
-REPORTS_DIR = Path(__file__).parent / "reports" / "rag"
+EVAL_FILE = Path(__file__).parent / "eval_set.yml"
+REPORTS_DIR = Path(__file__).parent / "reports"
 DEFAULT_K = 5
 
 

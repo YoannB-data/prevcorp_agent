@@ -10,14 +10,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Python 3.12 (pinned in `.python-version`)
 - **UV** is the package manager — use `uv` commands, not raw `pip`
-- Environment variables loaded from `.env` via python-dotenv; required: `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `MANIFEST_PATH`, `SEMANTIC_MANIFEST_PATH`, `DUCKDB_PATH`. Optional: `EDGE_BINARY` (full path to the Edge executable — only needed on machines without GTK3, as the fallback in `scripts/render.py` falls back to `"msedge"` on PATH otherwise, which fails with `FileNotFoundError` if Edge isn't on PATH). `scripts/render.py` calls `load_dotenv()` itself, so `EDGE_BINARY` is picked up from `.env` even when the script is invoked standalone, without relying on a manual export in the calling shell.
+- Environment variables loaded from `.env` via python-dotenv; required: `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `MANIFEST_PATH`, `SEMANTIC_MANIFEST_PATH`, `DUCKDB_PATH`. Optional: `EDGE_BINARY` (full path to the Edge executable — only needed on machines without GTK3, as the fallback in `.claude/skills/corpus-generator/scripts/render.py` falls back to `"msedge"` on PATH otherwise, which fails with `FileNotFoundError` if Edge isn't on PATH). `.claude/skills/corpus-generator/scripts/render.py` calls `load_dotenv()` itself, so `EDGE_BINARY` is picked up from `.env` even when the script is invoked standalone, without relying on a manual export in the calling shell.
 
 ```bash
 uv sync --all-groups                             # install dependencies (incl. dev tools)
 uv run pre-commit install                        # install git hooks (once per clone)
 uv run streamlit run src/app.py                  # launch Streamlit UI
-uv run python evals/run_evals.py                 # run full eval suite (SQL pipeline only)
-uv run python evals/run_evals.py --ids Q012 Q034 # run specific evals by ID
+uv run python evals/sql/run_evals.py                 # run full SQL eval suite (API cost)
+uv run python evals/sql/run_evals.py --ids Q012 Q034 # run specific SQL evals by ID
+uv run python evals/rag/run_evals.py --variant prefix --ids RC01 # RAG eval (see RAG Evaluation)
+uv run python evals/rag/run_faithfulness.py --ids RC01           # faithfulness (prefix collection only)
 uv run pytest tests/test_scorers.py::test_piege_60_contre_90  # run a single test
 
 # Checks CI (critère d'arrêt, exactement ce périmètre)
@@ -32,9 +34,9 @@ uv run ruff format src/ tests/ evals/
 
 The four "Checks CI" commands are exactly what CI (`.github/workflows/ci.yml`) runs on every PR/push to `main`.
 
-Pour générer un document du corpus PrevCorp (Règlement, Notice CCN, Résumé des garanties ou FAQ), décrire en langage naturel le type de document souhaité et le contenu à couvrir : le skill `corpus-generator` (`.claude/skills/corpus-generator/`) se déclenche automatiquement et orchestre la génération, y compris l'appel à `scripts/render.py` en interne.
+Pour générer un document du corpus PrevCorp (Règlement, Notice CCN, Résumé des garanties ou FAQ), décrire en langage naturel le type de document souhaité et le contenu à couvrir : le skill `corpus-generator` (`.claude/skills/corpus-generator/`) se déclenche automatiquement et orchestre la génération, y compris l'appel à `.claude/skills/corpus-generator/scripts/render.py` en interne.
 
-`scripts/render.py` utilise weasyprint, qui dépend de bibliothèques système GTK3/Pango non incluses dans le package Python. Sur Windows, cette dépendance native n'est pas installée par défaut et le rendu échoue avec une erreur `libgobject-2.0-0` ; installer le [GTK3 Runtime pour Windows](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer) résout le problème. Sur macOS/Linux, GTK est généralement déjà présent ou s'installe en une commande (`brew install gtk+3` / `apt install libgtk-3-0`).
+`.claude/skills/corpus-generator/scripts/render.py` utilise weasyprint, qui dépend de bibliothèques système GTK3/Pango non incluses dans le package Python. Sur Windows, cette dépendance native n'est pas installée par défaut et le rendu échoue avec une erreur `libgobject-2.0-0` ; installer le [GTK3 Runtime pour Windows](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer) résout le problème. Sur macOS/Linux, GTK est généralement déjà présent ou s'installe en une commande (`brew install gtk+3` / `apt install libgtk-3-0`).
 
 ## Architecture
 
@@ -57,20 +59,28 @@ src/
     generator.py            # chunks + question → cited answer via Claude
     pdf_text.py             # PDF text extraction (pdfplumber), no external client
     metadata.py             # Corpus document metadata (doc_id, doc_type), no external client
-    eval_schema.py          # Fail-fast schema/loader for the RAG eval YAML
-    evaluation/             # RAG eval runner package (retrieval, scorers, judge, faithfulness, diagnose, report)
+    evaluation/             # RAG eval runner package (schema, retrieval, scorers, judge, faithfulness, diagnose, report)
+      schema.py               # Fail-fast schema/loader for the RAG eval YAML
   prompts/
     system_prompt.md   # System prompt injected into every SQL agent call
     few_shot_bank.yml  # Few-shot examples pool (question + sql + keywords)
 evals/
-  eval_set.yml         # Evaluation questions with reference SQL and compare modes (SQL pipeline)
-  rag_questions_v1_25.yml # 25 RAG eval questions (YAML v1), validated by src/rag/eval_schema.py
-  run_rag_evals.py      # RAG eval runner CLI (R/E/I cube), reports in evals/reports/rag/
-  run_evals.py          # Eval runner: run_evals(), run_single_eval(), write_report()
-  reports/               # Timestamped Markdown reports + latest.json (read by sidebar)
-corpus/                # Generated PDFs (chunked for the RAG index) — gitignored, derivable from corpus_src/*.html via render.py; never the source of truth
-corpus_src/            # HTML source of each corpus document, committed to git — the real content asset (LLM-generated, non-deterministic), since eval questions reference exact values inside it
-scripts/               # dump_chunks.py (read-only Qdrant chunk viewer); render.py is referenced below but absent from this checkout
+  sql/                  # SQL pipeline evals
+    eval_set.yml          # Evaluation questions with reference SQL and compare modes
+    run_evals.py          # Eval runner: run_evals(), run_single_eval(), write_report()
+    reports/              # Timestamped Markdown reports (gitignored) + baselines/ (committed)
+  rag/                  # RAG pipeline evals
+    eval_set.yml          # 23 RAG eval questions (v4), validated by src/rag/evaluation/schema.py
+    run_evals.py          # RAG eval runner CLI (R/E/I cube)
+    run_faithfulness.py   # Faithfulness maison (variante prefix uniquement ; code 2 si la collection n'est pas en prefix)
+    CHANGELOG.md          # Versions et hashes des jeux de questions RAG, rapports de référence
+    reports/              # Rapports par run (gitignored) + baselines/ (committed)
+  reports/
+    latest.json           # Dernier score SQL, lu par la sidebar Streamlit (seul fichier de ce dossier)
+data/corpus/
+  src/                 # HTML source of each corpus document, committed to git — the real content asset (LLM-generated, non-deterministic), since eval questions reference exact values inside it
+  pdf/                 # Generated PDFs (chunked for the RAG index) — gitignored, derivable from src/*.html via render.py; never the source of truth
+scripts/               # dump_chunks.py (read-only Qdrant chunk viewer); render.py lives in .claude/skills/corpus-generator/scripts/, not here
 qdrant_storage/        # Local (embedded) Qdrant collection, populated by src/rag/ingestion.py
 logs/
   interactions.jsonl   # Append-only log: question, sql, status, tokens, cost, latency
@@ -79,7 +89,7 @@ logs/
 **Request flow**: `orchestrator_main(question)` (`src/orchestrator.py`) → `router.route()` classifies the question via a dedicated Claude call (`sql` or `rag`) → dispatches to one of two independent pipelines, returned as a unified `OrchestratorResult`:
 
 - **SQL pipeline** (`src/structured/sql_agent.py`): `agent_main(question)` builds a message with few-shot examples + schema + semantic layer → `_call_llm_with_retry()` → `_extract_sql()` → `execute_query()`. On SQL error: appends error + attempted SQL to the message and retries (up to `_MAX_RETRIES=3`). Logs every attempt (success or error) to JSONL. Returns `(sql_str, pd.DataFrame)`.
-- **RAG pipeline** (`src/rag/generator.py`): `generate(question)` → `retriever.retrieve()` embeds the question with Voyage and queries Qdrant for top-k chunks (optionally filtered by `doc_type`) → `generate_from_chunks()` formats the chunks into context and sends them to Claude with a citation-enforcing system prompt → returns `{question, answer, sources, chunks}`. The RAG pipeline has no retry loop; its eval harness is `evals/run_rag_evals.py` (see RAG Evaluation).
+- **RAG pipeline** (`src/rag/generator.py`): `generate(question)` → `retriever.retrieve()` embeds the question with Voyage and queries Qdrant for top-k chunks (optionally filtered by `doc_type`) → `generate_from_chunks()` formats the chunks into context and sends them to Claude with a citation-enforcing system prompt → returns `{question, answer, sources, chunks}`. The RAG pipeline has no retry loop; its eval harness is `evals/rag/run_evals.py` (see RAG Evaluation).
 
 **Two distinct retry loops in the SQL pipeline** (do not confuse them):
 - **Outer loop** in `agent_main` (up to `_MAX_RETRIES=3`): SQL correction — on `execute_query()` failure, the error + attempted SQL are appended to the message and Claude is called again.
@@ -94,11 +104,11 @@ logs/
 - `agent_main` accepts an optional `eval_question_id` for traceability in the JSONL log.
 - `LOGS_JSONL_PATH` (`logs/interactions.jsonl`) is relative to CWD — always launch from the project root.
 - `duckdb_executor.py` opens DuckDB in **read-only mode**; any write attempt raises an error at the DB level.
-- The RAG index (`qdrant_storage/`) is a local embedded Qdrant collection built by running `src/rag/ingestion.py` directly (`ingest_corpus()`); it is not rebuilt automatically when `corpus/` changes. Point IDs are deterministic hashes of `filename_chunkindex`, so re-ingestion is idempotent.
+- The RAG index (`qdrant_storage/`) is a local embedded Qdrant collection built by running `src/rag/ingestion.py` directly (`ingest_corpus()`); it is not rebuilt automatically when `data/corpus/pdf/` changes. Point IDs are deterministic hashes of `filename_chunkindex`, so re-ingestion is idempotent.
 - `qdrant_client.query_points()` is the current API — `.search()` is deprecated as of qdrant-client 1.18 and removed in later versions. `retriever.py` already uses `query_points()`; don't regress to `.search()` when refactoring.
 - `doc_id` is the stable key of a corpus document (stored in each chunk payload). `retrieve()` raises `ValueError` if a chunk has no `doc_id`: the collection was ingested before `doc_id` existed and must be re-ingested (`src/rag/ingestion.py`).
 - On process exit, Python may print `ImportError: sys.meta_path is None` originating from `portalocker` during `QdrantClient` garbage collection. This is cosmetic (an interpreter-shutdown artifact of the local/embedded Qdrant client) — ignore it, it does not indicate a real failure.
-- The `corpus-generator` skill (`.claude/skills/corpus-generator/`) internally calls `scripts/render.py`, which converts HTML to PDF via weasyprint and writes it to `corpus/` as `<TYPE>_<identifiant>.pdf` (prefix mapping in `_TYPE_PREFIXES`). If a generated PDF has an inconsistent name or lands in the wrong place, the bug is most likely in `build_filename()` or in the `corpus_dir` path passed to the script — not in the skill itself.
+- The `corpus-generator` skill (`.claude/skills/corpus-generator/`) internally calls `.claude/skills/corpus-generator/scripts/render.py`, which converts HTML to PDF via weasyprint and writes it to `data/corpus/pdf/` as `<TYPE>_<identifiant>.pdf` (prefix mapping in `_TYPE_PREFIXES`). If a generated PDF has an inconsistent name or lands in the wrong place, the bug is most likely in `build_filename()` or in the `corpus_dir` path passed to the script — not in the skill itself.
 - **Standing environment constraint, not a temporary fix**: on this machine, GTK3 cannot be installed, so `render.py` cannot use weasyprint directly — same category of constraint as the Qdrant local-mode decision above (corporate environment limits the ideal setup). `render.py` should detect the missing GTK3 dependency and fall back automatically to a headless-browser print-to-pdf (e.g. `msedge --headless --print-to-pdf=<out>.pdf <in>.html`) rather than relying on manually re-instructing each session to do so. The two engines (WeasyPrint vs. Chromium) don't guarantee identical rendering of table borders, page breaks, or column widths — spot-check a generated PDF visually after implementing the fallback, and note the standing constraint here rather than re-discovering it each session.
 
 ## Database Schema
@@ -111,7 +121,7 @@ Column descriptions come from the dbt manifest. `src/structured/schema_loader.py
 
 ## Evaluation Framework
 
-`evals/eval_set.yml` contains questions with `reference_sql` and a `compare` mode, evaluated against the SQL pipeline only (`agent_main`, not the orchestrator):
+`evals/sql/eval_set.yml` contains questions with `reference_sql` and a `compare` mode, evaluated against the SQL pipeline only (`agent_main`, not the orchestrator):
 - `scalar` — single cell, exact value match (float tolerance via `math.isclose`)
 - `named_scalar` — scalar value searched in any column of the agent result
 - `row_count` — same number of rows
@@ -119,14 +129,14 @@ Column descriptions come from the dbt manifest. `src/structured/schema_loader.py
 - `exact_sorted` — exact shape, values and order
 - `skip` — rag / hors_scope, no SQL evaluation
 
-After a full run, `evals/reports/latest.json` is updated with `score_pct`, `passed`, `evaluated`, `date` — this is what the Streamlit sidebar reads. **`latest.json` is only written on full runs; `--ids` filtered runs skip it.**
+Each run writes a timestamped report to `evals/sql/reports/`. After a full run, `evals/reports/latest.json` is updated with `score_pct`, `passed`, `evaluated`, `date` — this is what the Streamlit sidebar reads. **`latest.json` is only written on full runs; `--ids` filtered runs skip it.**
 
 Run evals after significant changes to `src/structured/sql_agent.py`, `src/structured/schema_loader.py`, or `src/prompts/system_prompt.md`.
 
 
 ## RAG Evaluation
 
-`uv run python evals/run_rag_evals.py [--k 5] [--variant none] [--ids RC01 ...]` rejoue les questions de `evals/rag_questions_v1_25.yml` (package `src/rag/evaluation/`). Chaque question est évaluée trois fois : retrieval (R, au niveau chunk : sources attendues dans le top-k ET formes des `points_obligatoires` dans un chunk d'une source attendue), end-to-end (E) et génération isolée (I, contexte = document entier de `contexte_effectif`). `diagnose()` croise R/E/I (`sans_reponse` : R = N/A). Rapport par run dans `evals/reports/rag/` (committé), un fichier nommé date + variante + hash du YAML.
+`uv run python evals/rag/run_evals.py [--k 5] [--variant none] [--ids RC01 ...]` rejoue les questions de `evals/rag/eval_set.yml` (v4, 23 questions ; versions et hashes dans `evals/rag/CHANGELOG.md` ; package `src/rag/evaluation/`). Chaque question est évaluée trois fois : retrieval (R, au niveau chunk : sources attendues dans le top-k ET formes des `points_obligatoires` dans un chunk d'une source attendue), end-to-end (E) et génération isolée (I, contexte = document entier de `contexte_effectif`). `diagnose()` croise R/E/I (`sans_reponse` : R = N/A). Rapport par run dans `evals/rag/reports/` (ignoré par git, sauf `baselines/`), un fichier nommé date + variante + hash du YAML.
 
 - Points `deterministe` : extraction par regex (`numbers.py`), jamais de LLM ni d'embeddings ; `chiffre_precis` interdit `verif: juge`. Points `juge` : un LLM coche oui/non, résultat « à vérifier à la main ». Les questions « écart » (valeurs à rattacher au bon document) passent par le juge : la présence de valeurs ne détecte pas une inversion.
 - `points_interdits` est exclu du contrôle de présence dans les chunks : ce sont des formulations de mauvaise source, leur absence des chunks attendus est normale.

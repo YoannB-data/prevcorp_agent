@@ -18,7 +18,7 @@ from src.rag.metadata import (
 )
 from src.rag.pdf_text import extract_text
 
-CORPUS = Path(__file__).parent.parent / "corpus"
+CORPUS = Path(__file__).parent.parent / "data" / "corpus" / "pdf"
 PDFS = sorted(CORPUS.glob("*.pdf"))
 JUMEAUX = {"NOTICE_CCN_metallurgie.pdf", "NOTICE_CCN_metallurgie_distracteur.pdf"}
 
@@ -100,7 +100,7 @@ def test_titre_ignore_la_banniere_commune():
 # ─── Vrais PDF du corpus ─────────────────────────────────────────────────────
 
 
-@pytest.mark.skipif(not PDFS, reason="corpus/ vide (PDF gitignorés)")
+@pytest.mark.skipif(not PDFS, reason="data/corpus/pdf/ vide (PDF gitignorés)")
 def test_prefixes_des_vrais_pdf_sans_signal_artificiel():
     prefixes = {p.name: ingestion.document_prefix(extract_text(p), p) for p in PDFS}
     for pdf in PDFS:
