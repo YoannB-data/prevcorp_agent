@@ -36,3 +36,10 @@ Format de sortie, par question :
 - id : PASS / À REVOIR
 - Problème (1 ligne) + correction proposée
 Termine par un résumé : n questions revues, n à revoir.
+
+## Comment le runner évalue les `formes`
+Lis `src/rag/evaluation/numbers.py` (fonction `forme_presente`) avant de juger un critère.
+- Forme purement chiffrée (« 8 % », « 60 jours ») : comparée par valeur + unité. « 8 % » ne matche PAS « 78 % ».
+- Texte normalisé avant comparaison : minuscules, sans accents, espaces insécables unifiés, nombres en lettres → chiffres.
+- Forme textuelle : match par mot entier. « continue » ne matche pas « discontinue », MAIS « enfant » ne matche pas « enfants » → signale les formes au singulier qui devraient accepter le pluriel.
+Ne signale un « critère trop lâche » que s'il l'est au regard de ces règles.

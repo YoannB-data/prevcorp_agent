@@ -30,6 +30,10 @@ def score(question: RagQuestion, answer: Answer, judge: Judge | None = None) -> 
     if a_juger and judge is None:
         raise ValueError(f"{question.id} : points verif=juge sans juge fourni")
     verdicts = judge.evaluate(question, answer.text, a_juger) if judge and a_juger else {}
+    # Guard - un juge qui oublie un id ne doit pas passer pour un verdict négatif
+    manquants = [p.id for p in a_juger if p.id not in verdicts]
+    if manquants:
+        raise ValueError(f"{question.id} : verdict du juge absent pour {manquants}")
 
     def affirme(point: Point) -> bool:
         """Verdict « la réponse affirme ce point », par juge ou par extraction."""

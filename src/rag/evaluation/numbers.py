@@ -113,7 +113,7 @@ def forme_presente(forme: str, text: str) -> bool:
     """Indique si une forme acceptable est présente dans un texte.
 
     Une forme purement chiffrée (« 60 jours ») est comparée par valeur et unité ; toute autre
-    forme est comparée comme sous-chaîne normalisée.
+    forme est comparée comme séquence de mots entiers dans le texte normalisé.
     """
 
     forme_norm = normaliser(forme)
@@ -128,4 +128,5 @@ def forme_presente(forme: str, text: str) -> bool:
             any(d.value == q.value and (not q.unit or d.unit == q.unit) for d in disponibles)
             for q, _ in scanned
         )
-    return forme_norm in text_norm
+    # Bornes alphanumériques - « continue » ne doit pas matcher « discontinue »
+    return re.search(rf"(?<![a-z0-9]){re.escape(forme_norm)}(?![a-z0-9])", text_norm) is not None

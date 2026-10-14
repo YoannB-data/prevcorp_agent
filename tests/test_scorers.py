@@ -198,3 +198,34 @@ def test_forme_non_chiffree_comparee_en_sous_chaine():
 def test_forme_chiffree_sans_unite_accepte_toute_unite():
     assert forme_presente("90", "délai de 90 jours")
     assert not forme_presente("90 jours", "délai de 90 mois")
+
+
+def test_forme_non_chiffree_ne_matche_pas_dans_un_mot_plus_long():
+    assert not forme_presente("continue", "une garantie discontinue")
+    assert forme_presente("continue", "une garantie continue.")
+
+
+def test_forme_chiffree_ne_matche_pas_dans_un_nombre_plus_grand():
+    assert not forme_presente("8 %", "un taux de 78 %")
+    assert forme_presente("8 %", "un taux de 8 %")
+
+
+def test_forme_mixte_chiffre_et_lettres_equivalents():
+    assert forme_presente("3 derniers mois", "sur les trois derniers mois")
+    assert forme_presente("trois derniers mois", "sur les 3 derniers mois")
+
+
+def test_forme_montant_avec_espace_insecable():
+    assert forme_presente("1 900 €", "un capital de 1 900 €")
+    assert forme_presente("1 900 €", "un capital de 1 900 €")
+
+
+def test_juge_sans_verdict_pour_un_id_leve():
+    class JugeIncomplet:
+        """Juge défaillant : ne rend aucun verdict."""
+
+        def evaluate(self, question, answer_text, points):
+            return {}
+
+    with pytest.raises(ValueError, match="verdict du juge absent"):
+        score(_question_ecart(), Answer("x"), JugeIncomplet())
