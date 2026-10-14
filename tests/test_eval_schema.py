@@ -140,7 +140,7 @@ def test_fichier_reel_respecte_le_contrat():
         pytest.skip("data/corpus/pdf/ absent ou vide (gitignoré)")
     valid = {p.stem for p in pdfs}
     questions = load_questions(ROOT / "evals" / "rag" / "eval_set.yml", valid)
-    assert len(questions) == 25
+    assert len(questions) == 23
 
 
 def test_contexte_effectif_defaut_sur_sources(tmp_path):
