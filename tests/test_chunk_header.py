@@ -1,4 +1,4 @@
-"""Tests du préfixe de contexte : constructeur, vrais PDF, ingestion, garde de variante."""
+"""Tests du header de contexte : extraction, vrais PDF, ingestion, garde de variante."""
 
 from pathlib import Path
 from types import SimpleNamespace
@@ -9,11 +9,8 @@ import pytest
 from src.rag import ingestion
 from src.rag.evaluation.adapters import check_variant, collection_variant
 from src.rag.metadata import (
-    ContractInfo,
     PrefixConstructionError,
     build_chunk_header,
-    build_context_prefix,
-    doc_type_from_filename,
     extract_contract_info,
     extract_title,
 )
@@ -21,15 +18,11 @@ from src.rag.pdf_text import extract_text
 
 CORPUS = Path(__file__).parent.parent / "data" / "corpus" / "pdf"
 PDFS = sorted(CORPUS.glob("*.pdf"))
-JUMEAUX = {"NOTICE_CCN_metallurgie.pdf", "NOTICE_CCN_metallurgie_distracteur.pdf"}
 
 RESUME_TEXT = (
     "PREVCORP PRÉVOYANCE\n"
     "Résumé des garanties — Contrat n° C20077\n"
     "Convention collective nationale du transport routier — Personnel non cadre\n"
-)
-RESUME_PREFIX = (
-    "[C20077 | résumé des garanties | Contrat C20077 — transport routier, Personnel non cadre]"
 )
 
 
@@ -46,17 +39,7 @@ def _stub_pdf(monkeypatch, text):
     monkeypatch.setattr(ingestion, "chunk_text", lambda _t: ["chunk brut un", "chunk brut deux"])
 
 
-# ─── Constructeur ────────────────────────────────────────────────────────────
-
-
-def test_prefixe_avec_contrat():
-    contract = ContractInfo("C20077", "transport routier", "Personnel non cadre")
-    assert build_context_prefix("", "resume_contrat", contract) == RESUME_PREFIX
-
-
-def test_prefixe_sans_contrat():
-    prefix = build_context_prefix("RÈGLEMENT GÉNÉRAL", "reglement", None)
-    assert prefix == "[RÈGLEMENT GÉNÉRAL | règlement]"
+# ─── Extraction ────────────────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize(
@@ -98,62 +81,34 @@ def test_titre_ignore_la_banniere_commune():
     assert extract_title(text, "FAQ.pdf") == "FOIRE AUX QUESTIONS"
 
 
-# ─── Vrais PDF du corpus ─────────────────────────────────────────────────────
-
-
-@pytest.mark.skipif(not PDFS, reason="data/corpus/pdf/ vide (PDF gitignorés)")
-def test_prefixes_des_vrais_pdf_sans_signal_artificiel():
-    prefixes = {p.name: ingestion.document_prefix(extract_text(p), p) for p in PDFS}
-    for pdf in PDFS:
-        assert "distracteur" not in prefixes[pdf.name].lower()
-        assert pdf.stem not in prefixes[pdf.name]
-    if JUMEAUX <= prefixes.keys():
-        jumeau, distracteur = (prefixes[name] for name in sorted(JUMEAUX))
-        assert jumeau == distracteur
-        # un seul doublon autorisé : la paire Métallurgie
-        assert len(set(prefixes.values())) == len(prefixes) - 1
-    else:
-        assert len(set(prefixes.values())) == len(prefixes)
-    for name, prefix in prefixes.items():
-        if doc_type_from_filename(name) == "resume_contrat":
-            contract_id = Path(name).stem.removeprefix("RESUME_")
-            assert prefix.startswith(
-                f"[{contract_id} | résumé des garanties | Contrat {contract_id}"
-            )
-
-
 # ─── Ingestion ───────────────────────────────────────────────────────────────
 
 
-def test_variante_prefix_embedde_le_prefixe_et_stocke_le_brut(monkeypatch):
+def test_ingestion_embedde_le_header_et_le_stocke_a_part(monkeypatch):
     _stub_pdf(monkeypatch, RESUME_TEXT)
     voyage, qdrant = _fake_voyage(), MagicMock()
-    counts = ingestion.ingest_pdf(Path("RESUME_C20077.pdf"), voyage, qdrant, "prefix")
+    ingestion.ingest_pdf(Path("RESUME_C20077.pdf"), voyage, qdrant, "autre_collection")
+    header = (
+        "Document : Résumé des garanties C20077 | Type : résumé des garanties | "
+        "Contrat : C20077 | CCN : transport routier, Personnel non cadre"
+    )
+    assert len(header) <= 150
     assert voyage.embed.call_args.args[0] == [
-        f"{RESUME_PREFIX}\nchunk brut un",
-        f"{RESUME_PREFIX}\nchunk brut deux",
+        f"{header}\nchunk brut un",
+        f"{header}\nchunk brut deux",
     ]
+    assert qdrant.upsert.call_args.kwargs["collection_name"] == "autre_collection"
     points = qdrant.upsert.call_args.kwargs["points"]
     assert [p.payload["text"] for p in points] == ["chunk brut un", "chunk brut deux"]
-    assert {p.payload["ingestion_variant"] for p in points} == {"prefix"}
-    assert counts == (2, 2)
-
-
-def test_variante_none_n_ajoute_pas_de_prefixe(monkeypatch):
-    _stub_pdf(monkeypatch, RESUME_TEXT)
-    voyage, qdrant = _fake_voyage(), MagicMock()
-    counts = ingestion.ingest_pdf(Path("RESUME_C20077.pdf"), voyage, qdrant, "none")
-    assert voyage.embed.call_args.args[0] == ["chunk brut un", "chunk brut deux"]
-    points = qdrant.upsert.call_args.kwargs["points"]
-    assert {p.payload["ingestion_variant"] for p in points} == {"none"}
-    assert counts == (2, 0)
+    assert {p.payload["header"] for p in points} == {header}
+    assert {p.payload["ingestion_variant"] for p in points} == {"header"}
 
 
 def test_resume_illisible_leve_au_lieu_de_degrader(monkeypatch):
     _stub_pdf(monkeypatch, "PREVCORP PRÉVOYANCE\nMISE EN PAGE INATTENDUE\n")
     voyage, qdrant = _fake_voyage(), MagicMock()
     with pytest.raises(PrefixConstructionError, match=r"RESUME_C20077\.pdf"):
-        ingestion.ingest_pdf(Path("RESUME_C20077.pdf"), voyage, qdrant, "prefix")
+        ingestion.ingest_pdf(Path("RESUME_C20077.pdf"), voyage, qdrant)
     voyage.embed.assert_not_called()
     qdrant.upsert.assert_not_called()
 
@@ -177,12 +132,14 @@ def test_recreate_sans_collection_ne_supprime_rien():
 def test_cli_recreate_precede_ingestion(monkeypatch):
     calls = []
     monkeypatch.setattr(ingestion, "default_clients", lambda: (MagicMock(), MagicMock()))
-    monkeypatch.setattr(ingestion, "recreate_collection", lambda _q, _c: calls.append("recreate"))
     monkeypatch.setattr(
-        ingestion, "ingest_corpus", lambda **kw: calls.append(("ingest", kw["variant"]))
+        ingestion, "recreate_collection", lambda _q, c: calls.append(("recreate", c))
     )
-    ingestion.main(["--recreate", "--variant", "prefix"])
-    assert calls == ["recreate", ("ingest", "prefix")]
+    monkeypatch.setattr(
+        ingestion, "ingest_corpus", lambda **kw: calls.append(("ingest", kw["collection"]))
+    )
+    ingestion.main(["--recreate", "--collection", "autre"])
+    assert calls == [("recreate", "autre"), ("ingest", "autre")]
 
 
 def test_cli_sans_recreate_ne_supprime_pas(monkeypatch):
@@ -192,26 +149,6 @@ def test_cli_sans_recreate_ne_supprime_pas(monkeypatch):
     monkeypatch.setattr(ingestion, "ingest_corpus", lambda **kw: calls.append("ingest"))
     ingestion.main([])
     assert calls == ["ingest"]
-
-
-def test_variante_header_embedde_le_header_et_le_stocke_a_part(monkeypatch):
-    _stub_pdf(monkeypatch, RESUME_TEXT)
-    voyage, qdrant = _fake_voyage(), MagicMock()
-    ingestion.ingest_pdf(Path("RESUME_C20077.pdf"), voyage, qdrant, "header", "autre_collection")
-    header = (
-        "Document : Résumé des garanties C20077 | Type : résumé des garanties | "
-        "Contrat : C20077 | CCN : transport routier, Personnel non cadre"
-    )
-    assert len(header) <= 150
-    assert voyage.embed.call_args.args[0] == [
-        f"{header}\nchunk brut un",
-        f"{header}\nchunk brut deux",
-    ]
-    assert qdrant.upsert.call_args.kwargs["collection_name"] == "autre_collection"
-    points = qdrant.upsert.call_args.kwargs["points"]
-    assert [p.payload["text"] for p in points] == ["chunk brut un", "chunk brut deux"]
-    assert {p.payload["header"] for p in points} == {header}
-    assert {p.payload["ingestion_variant"] for p in points} == {"header"}
 
 
 def test_header_une_ligne_150_caracteres_max_sur_les_vrais_pdf():
@@ -227,23 +164,11 @@ def test_header_trop_long_leve_au_lieu_de_tronquer():
         build_chunk_header("T" * 200, "reglement", None, "RESUME_X.pdf")
 
 
-def test_variante_none_et_prefix_sans_champ_header(monkeypatch):
-    _stub_pdf(monkeypatch, RESUME_TEXT)
-    qdrant = MagicMock()
-    ingestion.ingest_pdf(Path("RESUME_C20077.pdf"), _fake_voyage(), qdrant, "prefix")
-    assert all("header" not in p.payload for p in qdrant.upsert.call_args.kwargs["points"])
-
-
-def test_cli_header_refuse_la_collection_baseline():
-    with pytest.raises(SystemExit):
-        ingestion.main(["--variant", "header"])
-
-
 # ─── Garde de variante ───────────────────────────────────────────────────────
 
 
 def test_variante_de_collection_unique():
-    assert collection_variant([{"ingestion_variant": "prefix"}] * 3) == "prefix"
+    assert collection_variant([{"ingestion_variant": "header"}] * 3) == "header"
 
 
 def test_collection_sans_variante_refusee():
@@ -253,10 +178,10 @@ def test_collection_sans_variante_refusee():
 
 def test_collection_mixte_refusee():
     with pytest.raises(ValueError, match="mixte"):
-        collection_variant([{"ingestion_variant": "none"}, {"ingestion_variant": "prefix"}])
+        collection_variant([{"ingestion_variant": "header"}, {"ingestion_variant": "autre"}])
 
 
 def test_variante_declaree_differente_refusee():
-    with pytest.raises(ValueError, match="--variant prefix.*'none'"):
-        check_variant("prefix", "none")
-    check_variant("prefix", "prefix")
+    with pytest.raises(ValueError, match="--variant header.*'autre'"):
+        check_variant("header", "autre")
+    check_variant("header", "header")
