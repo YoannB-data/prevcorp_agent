@@ -19,7 +19,7 @@ uv run streamlit run src/app.py                  # launch Streamlit UI
 uv run python evals/sql/run_evals.py                 # run full SQL eval suite (API cost)
 uv run python evals/sql/run_evals.py --ids Q012 Q034 # run specific SQL evals by ID
 uv run python evals/rag/run_evals.py --ids RC01 # RAG eval (see RAG Evaluation)
-uv run python evals/rag/run_faithfulness.py --ids RC01           # faithfulness (prefix collection only)
+uv run python evals/rag/run_faithfulness.py --ids RC01           # faithfulness (collection header uniquement)
 uv run pytest tests/test_scorers.py::test_piege_60_contre_90  # run a single test
 
 # Checks CI (critère d'arrêt, exactement ce périmètre)
@@ -136,12 +136,14 @@ Run evals after significant changes to `src/structured/sql_agent.py`, `src/struc
 
 ## RAG Evaluation
 
-`uv run python evals/rag/run_evals.py [--k 5] [--variant none] [--ids RC01 ...]` rejoue les questions de `evals/rag/eval_set.yml` (v4, 23 questions ; versions et hashes dans `evals/rag/CHANGELOG.md` ; package `src/rag/evaluation/`). Chaque question est évaluée trois fois : retrieval (R, au niveau chunk : sources attendues dans le top-k ET formes des `points_obligatoires` dans un chunk d'une source attendue), end-to-end (E) et génération isolée (I, contexte = document entier de `contexte_effectif`). `diagnose()` croise R/E/I (`sans_reponse` : R = N/A). Rapport par run dans `evals/rag/reports/` (ignoré par git, sauf `baselines/`), un fichier nommé date + variante + hash du YAML.
+`uv run python evals/rag/run_evals.py [--k 5] [--variant header] [--ids RC01 ...]` rejoue les questions de `evals/rag/eval_set.yml` (v4, 23 questions ; versions et hashes dans `evals/rag/CHANGELOG.md` ; package `src/rag/evaluation/`). Chaque question est évaluée trois fois : retrieval (R, au niveau chunk : sources attendues dans le top-k ET formes des `points_obligatoires` dans un chunk d'une source attendue), end-to-end (E) et génération isolée (I, contexte = document entier de `contexte_effectif`). `diagnose()` croise R/E/I (`sans_reponse` : R = N/A). Rapport par run dans `evals/rag/reports/` (ignoré par git, sauf `baselines/`), un fichier nommé date + variante + hash du YAML.
 
 - Points `deterministe` : extraction par regex (`numbers.py`), jamais de LLM ni d'embeddings ; `chiffre_precis` interdit `verif: juge`. Points `juge` : un LLM coche oui/non, résultat « à vérifier à la main ». Les questions « écart » (valeurs à rattacher au bon document) passent par le juge : la présence de valeurs ne détecte pas une inversion.
 - `points_interdits` est exclu du contrôle de présence dans les chunks : ce sont des formulations de mauvaise source, leur absence des chunks attendus est normale.
 - Limite connue (RC08) : les valeurs sont vérifiées par présence, sans rattachement à leur source, car `chiffre_precis` interdit le juge.
 - Chaque chunk est embeddé avec un header contextuel d'une ligne (150 caractères max, `PrefixConstructionError` au-delà), stocké à part dans le champ `header` du payload ; `text` reste le texte brut. `ingestion_variant` (`header`) est enregistré par `python -m src.rag.ingestion [--collection ...] [--recreate]` ; le runner refuse de tourner (code 2) si `--variant` ne correspond pas à la collection.
+- Ne jamais concaténer le header dans `payload["text"]` : le matcher de R lit `text`, et un header commun à tous les chunks d'un document validerait R au niveau document (faux PASS).
+- R est déterministe ; E et I sont bruités (±3/23 observé). Comparer E/I sur ≥3 runs par variante, baseline comprise, eval set figé. Un changement de prompt de génération ne doit jamais modifier R : si R bouge, c'est un bug du runner.
 - **Écart de température éval/prod** : l'éval force `temperature=0` (`generate_from_chunks(..., temperature=0.0)`), alors que `generator.generate()` en prod garde le défaut de l'API (1.0). Les scores d'éval ne mesurent donc pas exactement le comportement de l'app.
 - Le runner ouvre Qdrant local (verrou disque) : ne pas le lancer pendant que Streamlit tourne. Les appels réels (Voyage, Anthropic) coûtent : ne les lancer qu'à dessein.
 - `inspect_chunks.py` est un script de debug local, dans `.gitignore`.
@@ -167,7 +169,7 @@ Une tâche est terminée quand les 4 commandes de la CI passent, avec exactement
 Règles de rapport :
 - Citer la commande exacte et la sortie brute de chacune, avec son périmètre.
 - Lister TOUT fichier de `src/` modifié, avec la raison, y compris les changements de comportement (nouvelle exception, nouveau paramètre).
-- Un changement de `src/` va dans son propre commit, jamais dans un commit de CLI ou de tests.
+- Un changement de `src/` et ses tests vont dans le même commit ; jamais mélangés avec des changements de CLI, d'evals ou de config sans lien.
 - Ne modifier le code qu'après approbation du plan.
 
 ## Git / Commits
@@ -175,9 +177,9 @@ Règles de rapport :
 Un commit = une intention. Ne jamais regrouper des changements sans lien dans un seul commit.
 
 Exemples de bons découpages :
-- Nouvelle fonctionnalité agent (nouveau module Python) → 1 commit
+- Nouvelle fonctionnalité agent (nouveau module Python + ses tests) → 1 commit
 - Modification du system prompt → 1 commit
-- Correction sur un module existant → 1 commit
+- Correction sur un module existant (+ test de non-régression) → 1 commit
 - Refacto Python → 1 commit
 
 Format des messages : `type(scope): description courte`
@@ -187,6 +189,8 @@ Types courants : `feat`, `fix`, `refactor`, `docs`, `chore`
   (`git config user.email` à vérifier avant tout commit). L'historique antérieur de `dev`
   contient des commits avec une adresse professionnelle ; c'est une décision assumée,
   ne pas réécrire l'historique.
+- `.gitattributes` force `*.yml text eol=lf` : un CRLF change le hash de l'eval set
+  (référencé dans `evals/rag/CHANGELOG.md`).
 
 ## Code Style
 
