@@ -7,7 +7,28 @@ Le hash du YAML (nom des rapports, champ « Hash du YAML ») est le sha256 des *
 | v1 | `rag_questions_v1_25.yml` (supprimé du dépôt, voir Réorganisation) | `ae7aed3dcc6a` |
 | v2 | `rag_questions_v2_25.yml`, devenu `evals/rag/eval_set.yml` | `ddfd3583dae4` |
 | v3 | `evals/rag/eval_set.yml` (jamais rejoué) | `f12821773e6c` |
-| v4 | `evals/rag/eval_set.yml` | `2bd3dc85629a` (`938200a6916b` avant le remplacement de l'en-tête) |
+| v4 | `evals/rag/eval_set.yml` | `2bd3dc85629a` (`938200a6916b` avant le remplacement de l'en-tête ; `4e691d6ac878` pour la même version extraite en CRLF sous Windows) |
+
+## Drill chunk-header (2026-10-15)
+
+Header contextuel déterministe sur les chunks, mesuré sur l'eval set v4 (inchangé). Branche `drill/chunk-header`.
+
+### Changed
+- Ingestion RAG : le header contextuel d'une ligne (Document | Type | Contrat | CCN) remplace le préfixe entre crochets. Il est embeddé uniquement, le payload `text` reste brut (le header est stocké dans le champ `header`).
+- `retrieve()` et `build_deps()` prennent un paramètre `collection` (défaut `prevcorp_docs`).
+- Un header de plus de 150 caractères lève `PrefixConstructionError`, au lieu d'être tronqué en silence.
+
+### Removed
+- Variantes d'ingestion `none` et `prefix`, `build_context_prefix`, `chunk_by_article`, ainsi que le wrapper `scripts/run_rag_eval_collection.py`.
+
+### Added
+- `scripts/diag_croisement.py` : diagnostic retrieval sur les questions de croisement, qui appelle `check_retrieval`.
+- Baseline RAG versionnée dans `evals/rag/reports/baselines/` (`rag_20261015_103550_header_4e691d6ac878.md`).
+
+### Résultats (eval set `4e691d6ac878`, k=5)
+- R : 15/21 → 16/21 (RC24). Croisement : 3/8 → 4/8. RC03, RC20, RC22 et RC25 restent en échec de retrieval.
+- E/I : un seul run, bruit observé de ±3/23 entre deux runs identiques.
+- Le hash `4e691d6ac878` est celui du fichier extrait en CRLF sous Windows (`core.autocrlf`) ; le contenu committed est celui de v4 (`2bd3dc85629a`). Les rapports `prefix` et `header` du 15/10 portent ce même hash et se comparent entre eux.
 
 ## v4 (2026-10-14)
 
@@ -88,6 +109,7 @@ Format modifié le 9/10/2026 : le rapport liste désormais toutes les affirmatio
 | `faithfulness_20261009_140338_prefix_ddfd3583dae4_partial.md` | `ddfd3583dae4` (v2) | prefix | 5 (partiel : RC17, RC20, RC24, RC25) |
 | `rag_20261009_113428_none_ddfd3583dae4.md` | `ddfd3583dae4` (v2) | none | 5 |
 | `rag_20261014_111113_prefix_938200a6916b.md` | `938200a6916b` (v4) | prefix | 5 |
+| `rag_20261015_103550_header_4e691d6ac878.md` | `4e691d6ac878` (v4, CRLF) | header | 5 |
 
 ## Dette connue
 
