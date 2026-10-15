@@ -16,6 +16,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from src.rag.metadata import (
+    build_chunk_header,
     build_context_prefix,
     doc_type_from_filename,
     extract_contract_info,
@@ -35,8 +36,8 @@ MAX_ARTICLE_WORDS = 300
 # Lookahead : le titre de l'article reste en tête de sa section
 ARTICLE_START = re.compile(r"(?m)^(?=Article \d+ — )")
 
-Variant = Literal["none", "prefix", "prefix_article"]
-PREFIXED_VARIANTS = ("prefix", "prefix_article")
+Variant = Literal["none", "prefix", "prefix_article", "header"]
+PREFIXED_VARIANTS = ("prefix", "prefix_article", "header")
 
 
 def default_clients() -> tuple[voyageai.Client, QdrantClient]:
@@ -96,18 +97,18 @@ def chunk_id(pdf_path: Path, chunk_index: int) -> str:
 # ─── Qdrant ──────────────────────────────────────────────────────────────────
 
 
-def ensure_collection(qdrant: QdrantClient) -> None:
+def ensure_collection(qdrant: QdrantClient, collection: str = COLLECTION_NAME) -> None:
     """Crée la collection Qdrant si elle n'existe pas."""
 
     existing = [c.name for c in qdrant.get_collections().collections]
-    if COLLECTION_NAME not in existing:
+    if collection not in existing:
         qdrant.create_collection(
-            collection_name=COLLECTION_NAME,
+            collection_name=collection,
             vectors_config=VectorParams(size=1024, distance=Distance.COSINE),
         )
-        print(f"Collection '{COLLECTION_NAME}' créée.")
+        print(f"Collection '{collection}' créée.")
     else:
-        print(f"Collection '{COLLECTION_NAME}' existante — on continue.")
+        print(f"Collection '{collection}' existante — on continue.")
 
 
 def upsert_chunks(
@@ -116,10 +117,14 @@ def upsert_chunks(
     embeddings: list[list[float]],
     pdf_path: Path,
     variant: Variant,
+    collection: str = COLLECTION_NAME,
+    header: str | None = None,
 ) -> None:
     """Insère les chunks bruts + embeddings + métadonnées dans Qdrant."""
 
     doc_type = doc_type_from_filename(pdf_path.name)
+    # Le header reste hors de "text" : le matcher des points obligatoires lit le texte brut
+    extra = {"header": header} if header is not None else {}
     points = []
     for i, (chunk, vector) in enumerate(zip(chunks, embeddings)):
         points.append(
@@ -134,10 +139,11 @@ def upsert_chunks(
                     "chunk_index": i,
                     # Lu par l'éval pour refuser un label qui ne correspond pas à l'index
                     "ingestion_variant": variant,
+                    **extra,
                 },
             )
         )
-    qdrant.upsert(collection_name=COLLECTION_NAME, points=points)
+    qdrant.upsert(collection_name=collection, points=points)
 
 
 # ─── Préfixe de contexte ─────────────────────────────────────────────────────
@@ -147,6 +153,15 @@ def embedding_text(chunk: str, prefix: str) -> str:
     """Texte envoyé à l'embedding : préfixe, saut de ligne, chunk brut."""
 
     return f"{prefix}\n{chunk}"
+
+
+def document_header(text: str, pdf_path: Path) -> str:
+    """Header contextuel d'un document ; lève PrefixConstructionError plutôt que de dégrader."""
+
+    doc_type = doc_type_from_filename(pdf_path.name)
+    if doc_type == "resume_contrat":
+        return build_chunk_header("", doc_type, extract_contract_info(text, pdf_path.name))
+    return build_chunk_header(extract_title(text, pdf_path.name), doc_type, None)
 
 
 def document_prefix(text: str, pdf_path: Path) -> str:
@@ -167,6 +182,7 @@ def ingest_pdf(
     voyage: voyageai.Client,
     qdrant: QdrantClient,
     variant: Variant = "none",
+    collection: str = COLLECTION_NAME,
 ) -> tuple[int, int]:
     """Ingère un seul PDF. Retourne (chunks insérés, chunks dont l'embedding est préfixé)."""
 
@@ -175,14 +191,15 @@ def ingest_pdf(
         print(f"  ⚠ Texte vide : {pdf_path.name}")
         return 0, 0
     chunks = chunk_by_article(text) if variant == "prefix_article" else chunk_text(text)
+    header = document_header(text, pdf_path) if variant == "header" else None
     if variant in PREFIXED_VARIANTS:
-        prefix = document_prefix(text, pdf_path)
+        prefix = header if header is not None else document_prefix(text, pdf_path)
         embedded = [embedding_text(c, prefix) for c in chunks]
     else:
         embedded = chunks
     result = voyage.embed(embedded, model=EMBEDDING_MODEL, input_type="document")
     embeddings = [[float(x) for x in vector] for vector in result.embeddings]
-    upsert_chunks(qdrant, chunks, embeddings, pdf_path, variant)
+    upsert_chunks(qdrant, chunks, embeddings, pdf_path, variant, collection, header)
     return len(chunks), len(chunks) if variant in PREFIXED_VARIANTS else 0
 
 
@@ -190,11 +207,12 @@ def ingest_corpus(
     corpus_dir: Path = CORPUS_DIR,
     variant: Variant = "none",
     clients: tuple[voyageai.Client, QdrantClient] | None = None,
+    collection: str = COLLECTION_NAME,
 ) -> int:
     """Ingère tous les PDFs du corpus et affiche les chunks préfixés par type. Retourne le total."""
 
     voyage, qdrant = clients or default_clients()
-    ensure_collection(qdrant)
+    ensure_collection(qdrant, collection)
     pdfs = sorted(corpus_dir.glob("*.pdf"))
     if not pdfs:
         print(f"Aucun PDF trouvé dans {corpus_dir}")
@@ -202,7 +220,7 @@ def ingest_corpus(
     print(f"\n{len(pdfs)} PDFs à ingérer (variante : {variant})...\n")
     per_type: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     for pdf_path in pdfs:
-        n, n_prefixed = ingest_pdf(pdf_path, voyage, qdrant, variant)
+        n, n_prefixed = ingest_pdf(pdf_path, voyage, qdrant, variant, collection)
         stats = per_type[doc_type_from_filename(pdf_path.name)]
         stats[0] += n
         stats[1] += n_prefixed
@@ -215,25 +233,33 @@ def ingest_corpus(
     return total
 
 
-def recreate_collection(qdrant: QdrantClient) -> None:
+def recreate_collection(qdrant: QdrantClient, collection: str = COLLECTION_NAME) -> None:
     """Supprime la collection si elle existe, pour repartir d'un index vide."""
 
-    if COLLECTION_NAME in [c.name for c in qdrant.get_collections().collections]:
-        qdrant.delete_collection(COLLECTION_NAME)
-        print(f"Collection '{COLLECTION_NAME}' supprimée.")
+    if collection in [c.name for c in qdrant.get_collections().collections]:
+        qdrant.delete_collection(collection)
+        print(f"Collection '{collection}' supprimée.")
 
 
 def main(argv: list[str] | None = None) -> int:
     """Point d'entrée CLI : --variant choisit l'embedding, --recreate vide l'index avant."""
 
     parser = argparse.ArgumentParser(description="Ingestion du corpus PrevCorp dans Qdrant")
-    parser.add_argument("--variant", choices=["none", "prefix", "prefix_article"], default="none")
+    parser.add_argument(
+        "--variant", choices=["none", "prefix", "prefix_article", "header"], default="none"
+    )
+    parser.add_argument(
+        "--collection", default=COLLECTION_NAME, help="collection cible (défaut : prevcorp_docs)"
+    )
     parser.add_argument("--recreate", action="store_true", help="supprime la collection avant")
     args = parser.parse_args(argv)
+    # Guard - la variante header est un test A/B : elle ne doit jamais écraser la baseline
+    if args.variant == "header" and args.collection == COLLECTION_NAME:
+        parser.error(f"--variant header exige --collection différente de {COLLECTION_NAME}")
     clients = default_clients()
     if args.recreate:
-        recreate_collection(clients[1])
-    ingest_corpus(variant=args.variant, clients=clients)
+        recreate_collection(clients[1], args.collection)
+    ingest_corpus(variant=args.variant, clients=clients, collection=args.collection)
     return 0
 
 

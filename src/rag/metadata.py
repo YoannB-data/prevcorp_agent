@@ -101,3 +101,26 @@ def build_context_prefix(title: str, doc_type: str, contract: ContractInfo | Non
             f"Contrat {contract.contract_id} — {contract.ccn}, {contract.category}]"
         )
     return f"[{title} | {DOC_TYPE_LABELS.get(doc_type, DOC_TYPE_LABELS['autre'])}]"
+
+
+MAX_HEADER_CHARS = 150
+
+
+def build_chunk_header(title: str, doc_type: str, contract: ContractInfo | None) -> str:
+    """Header d'une ligne (150 caractères max) ; le doc_id est exclu, il peut trahir le rôle."""
+
+    label = DOC_TYPE_LABELS.get(doc_type, DOC_TYPE_LABELS["autre"])
+    if contract is not None:
+        parts = [
+            f"Document : Résumé des garanties {contract.contract_id}",
+            f"Type : {label}",
+            f"Contrat : {contract.contract_id}",
+            f"CCN : {contract.ccn}, {contract.category}",
+        ]
+    else:
+        parts = [f"Document : {title}", f"Type : {label}"]
+    header = " | ".join(parts)
+    # Troncature sur une frontière de mot pour ne pas couper une valeur en deux
+    return (
+        header if len(header) <= MAX_HEADER_CHARS else header[:MAX_HEADER_CHARS].rsplit(" ", 1)[0]
+    )

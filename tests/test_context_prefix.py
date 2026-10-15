@@ -176,7 +176,7 @@ def test_recreate_sans_collection_ne_supprime_rien():
 def test_cli_recreate_precede_ingestion(monkeypatch):
     calls = []
     monkeypatch.setattr(ingestion, "default_clients", lambda: (MagicMock(), MagicMock()))
-    monkeypatch.setattr(ingestion, "recreate_collection", lambda _q: calls.append("recreate"))
+    monkeypatch.setattr(ingestion, "recreate_collection", lambda _q, _c: calls.append("recreate"))
     monkeypatch.setattr(
         ingestion, "ingest_corpus", lambda **kw: calls.append(("ingest", kw["variant"]))
     )
@@ -187,10 +187,50 @@ def test_cli_recreate_precede_ingestion(monkeypatch):
 def test_cli_sans_recreate_ne_supprime_pas(monkeypatch):
     calls = []
     monkeypatch.setattr(ingestion, "default_clients", lambda: (MagicMock(), MagicMock()))
-    monkeypatch.setattr(ingestion, "recreate_collection", lambda _q: calls.append("recreate"))
+    monkeypatch.setattr(ingestion, "recreate_collection", lambda _q, _c: calls.append("recreate"))
     monkeypatch.setattr(ingestion, "ingest_corpus", lambda **kw: calls.append("ingest"))
     ingestion.main([])
     assert calls == ["ingest"]
+
+
+def test_variante_header_embedde_le_header_et_le_stocke_a_part(monkeypatch):
+    _stub_pdf(monkeypatch, RESUME_TEXT)
+    voyage, qdrant = _fake_voyage(), MagicMock()
+    ingestion.ingest_pdf(Path("RESUME_C20077.pdf"), voyage, qdrant, "header", "autre_collection")
+    header = (
+        "Document : Résumé des garanties C20077 | Type : résumé des garanties | "
+        "Contrat : C20077 | CCN : transport routier, Personnel non cadre"
+    )
+    assert len(header) <= 150
+    assert voyage.embed.call_args.args[0] == [
+        f"{header}\nchunk brut un",
+        f"{header}\nchunk brut deux",
+    ]
+    assert qdrant.upsert.call_args.kwargs["collection_name"] == "autre_collection"
+    points = qdrant.upsert.call_args.kwargs["points"]
+    assert [p.payload["text"] for p in points] == ["chunk brut un", "chunk brut deux"]
+    assert {p.payload["header"] for p in points} == {header}
+    assert {p.payload["ingestion_variant"] for p in points} == {"header"}
+
+
+def test_header_une_ligne_150_caracteres_max_sur_les_vrais_pdf():
+    for pdf in PDFS:
+        header = ingestion.document_header(extract_text(pdf), pdf)
+        assert "\n" not in header
+        assert len(header) <= 150
+        assert pdf.stem not in header
+
+
+def test_variante_none_et_prefix_sans_champ_header(monkeypatch):
+    _stub_pdf(monkeypatch, RESUME_TEXT)
+    qdrant = MagicMock()
+    ingestion.ingest_pdf(Path("RESUME_C20077.pdf"), _fake_voyage(), qdrant, "prefix")
+    assert all("header" not in p.payload for p in qdrant.upsert.call_args.kwargs["points"])
+
+
+def test_cli_header_refuse_la_collection_baseline():
+    with pytest.raises(SystemExit):
+        ingestion.main(["--variant", "header"])
 
 
 # ─── Garde de variante ───────────────────────────────────────────────────────
