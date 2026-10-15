@@ -22,8 +22,8 @@ def main() -> int:
     parser.add_argument("--k", type=int, default=DEFAULT_K, help="taille du top-k du retrieval")
     parser.add_argument(
         "--variant",
-        choices=["none", "prefix", "prefix_article", "contextual", "header"],
-        default="none",
+        choices=["header"],
+        default="header",
         help="variante d'ingestion attendue, vérifiée contre la collection",
     )
     parser.add_argument("--judge-model", default=None, help="modèle du juge (défaut : MODEL)")
