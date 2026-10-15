@@ -1,11 +1,12 @@
 """Diagnostic retrieval seul (K=20) sur les questions de croisement en échec."""
 
 from pathlib import Path
-from typing import Any
 
-import yaml
 from qdrant_client.models import FieldCondition, Filter, MatchValue
 
+from src.rag.evaluation.models import RetrievedChunk
+from src.rag.evaluation.retrieval import check_retrieval
+from src.rag.evaluation.schema import RagQuestion, load_questions
 from src.rag.retriever import COLLECTION_NAME, qdrant_client, retrieve
 
 EVAL_SET_PATH = Path("evals/rag/eval_set.yml")
@@ -13,11 +14,10 @@ K = 20
 QUESTION_IDS = ["RC03", "RC20", "RC22", "RC24", "RC25"]
 
 
-def load_questions(path: Path) -> list[dict[str, Any]]:
-    """Charge les questions ciblées de l'eval set, sans validation de schéma."""
+def target_questions(valid_doc_ids: set[str]) -> list[RagQuestion]:
+    """Questions ciblées de l'eval set, validées par le schéma du runner."""
 
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    return [q for q in data["questions"] if q["id"] in QUESTION_IDS]
+    return [q for q in load_questions(EVAL_SET_PATH, valid_doc_ids) if q.id in QUESTION_IDS]
 
 
 def indexed_doc_ids() -> dict[str, int]:
@@ -39,25 +39,29 @@ def indexed_doc_ids() -> dict[str, int]:
 def main() -> None:
     """Affiche rang des sources attendues, top-5 réel et chunks indexés."""
 
-    questions = load_questions(EVAL_SET_PATH)
+    counts = indexed_doc_ids()
+    questions = target_questions(set(counts))
     all_expected: set[str] = set()
     print(f"\n=== Retrieval seul, K={K} ===\n")
     for q in questions:
-        expected = q["sources_attendues"]
+        expected = q.sources_attendues
         all_expected.update(expected)
-        hits = retrieve(q["question"], top_k=K)
+        hits = retrieve(q.question, top_k=K)
         ranks: dict[str, int | None] = {src: None for src in expected}
         for rank, hit in enumerate(hits, start=1):
             if hit["doc_id"] in ranks and ranks[hit["doc_id"]] is None:
                 ranks[hit["doc_id"]] = rank
-        print(q["id"])
+        chunks = [
+            RetrievedChunk(h["doc_id"], h["chunk_index"], h["score"], h["text"], h["source"])
+            for h in hits
+        ]
+        print(f"{q.id}  R = {check_retrieval(q, chunks)}")
         for src, rank in ranks.items():
             verdict = "ABSENT" if rank is None else f"rang {rank}"
             print(f"  {src:<40} {verdict}")
         print(f"  top-5 réel : {[h['doc_id'] for h in hits[:5]]}\n")
 
     print("=== Chunks indexés par source attendue ===\n")
-    counts = indexed_doc_ids()
     for src in sorted(all_expected):
         n = qdrant_client.count(
             COLLECTION_NAME,
