@@ -60,16 +60,18 @@ def _to_dict(chunk: RetrievedChunk) -> dict:
     return data
 
 
-def build_deps(judge_model: str | None = None) -> Deps:
+def build_deps(judge_model: str | None = None, collection: str | None = None) -> Deps:
     """Construit les dépendances réelles ; imports paresseux (Qdrant local verrouille le disque)."""
 
     from src.config import ANTHROPIC_API_KEY, MODEL
     from src.rag import generator, retriever
 
+    target = collection or retriever.COLLECTION_NAME
+
     def retrieve(question: str, k: int) -> list[RetrievedChunk]:
         """Top-k Qdrant converti en RetrievedChunk."""
 
-        hits = retriever.retrieve(question, top_k=k)
+        hits = retriever.retrieve(question, top_k=k, collection=target)
         return [
             RetrievedChunk(
                 doc_id=h["doc_id"],
@@ -93,7 +95,7 @@ def build_deps(judge_model: str | None = None) -> Deps:
         """Tous les chunks d'un document, dans l'ordre du document."""
 
         points, _ = retriever.qdrant_client.scroll(
-            collection_name=retriever.COLLECTION_NAME,
+            collection_name=target,
             scroll_filter=Filter(
                 must=[FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]
             ),
@@ -115,7 +117,7 @@ def build_deps(judge_model: str | None = None) -> Deps:
         return sorted(chunks, key=lambda c: c.chunk_index)
 
     points, _ = retriever.qdrant_client.scroll(
-        collection_name=retriever.COLLECTION_NAME,
+        collection_name=target,
         limit=SCROLL_LIMIT,
         with_payload=["doc_id", "ingestion_variant"],
     )

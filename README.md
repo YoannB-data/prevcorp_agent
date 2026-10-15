@@ -99,7 +99,7 @@ Pour appeler directement le pipeline SQL : `from src.structured.sql_agent import
 L'index Qdrant (`qdrant_storage/`) n'est pas reconstruit automatiquement quand `data/corpus/pdf/` change :
 
 ```bash
-uv run python -m src.rag.ingestion [--variant none|prefix] [--recreate]
+uv run python -m src.rag.ingestion [--collection NOM] [--recreate]
 ```
 
 ## Évaluations
@@ -116,7 +116,7 @@ Les résultats sont écrits dans `evals/sql/reports/` (Markdown horodaté) et `e
 ### RAG
 
 ```bash
-uv run python evals/rag/run_evals.py [--k 5] [--variant none] [--ids RC01 ...]
+uv run python evals/rag/run_evals.py [--k 5] [--ids RC01 ...]
 ```
 
 Chaque question de `evals/rag/eval_set.yml` est évaluée en retrieval (R), de bout en bout (E) et en génération isolée (I). Rapports dans `evals/rag/reports/`. Ne pas lancer pendant que Streamlit tourne (verrou disque Qdrant) ; les appels Voyage et Anthropic sont facturés.
@@ -169,7 +169,7 @@ evals/
   rag/                 # Éval du pipeline RAG
     eval_set.yml         # 25 questions d'éval RAG
     run_evals.py         # Runner d'évaluation RAG
-    run_faithfulness.py  # Faithfulness (variante prefix)
+    run_faithfulness.py  # Faithfulness (variante header)
     CHANGELOG.md         # Versions et hashes des jeux de questions
     reports/             # Rapports Markdown (baselines/ versionné)
   reports/latest.json  # Dernier score SQL, lu par la sidebar Streamlit

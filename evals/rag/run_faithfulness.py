@@ -1,4 +1,4 @@
-"""Faithfulness maison sur les questions RAG : variante prefix, rapport markdown versionné."""
+"""Faithfulness maison sur les questions RAG : variante header, rapport markdown versionné."""
 
 import argparse
 import sys
@@ -20,11 +20,11 @@ from src.rag.evaluation.schema import load_questions
 EVAL_FILE = Path(__file__).parent / "eval_set.yml"
 REPORTS_DIR = Path(__file__).parent / "reports"
 DEFAULT_K = 5
-VARIANT = "prefix"
+VARIANT = "header"
 
 
 def main() -> int:
-    """Lance le run et retourne 2 si la collection n'est pas en prefix, 1 en cas d'erreur d'I/O."""
+    """Lance le run et retourne 2 si la collection n'est pas en header, 1 en cas d'erreur d'I/O."""
 
     parser = argparse.ArgumentParser(description="Faithfulness maison PrevCorp")
     parser.add_argument("--yaml", type=Path, default=EVAL_FILE, help="fichier de questions")
