@@ -5,10 +5,8 @@ Pipeline d'ingestion : PDF → texte → chunks → embeddings Voyage → Qdrant
 import argparse
 import hashlib
 import os
-import re
 from collections import defaultdict
 from pathlib import Path
-from typing import Literal
 
 import voyageai
 from dotenv import load_dotenv
@@ -17,7 +15,6 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from src.rag.metadata import (
     build_chunk_header,
-    build_context_prefix,
     doc_type_from_filename,
     extract_contract_info,
     extract_title,
@@ -32,12 +29,8 @@ COLLECTION_NAME = "prevcorp_docs"
 EMBEDDING_MODEL = "voyage-multilingual-2"
 CHUNK_SIZE = 150
 CHUNK_OVERLAP = 20
-MAX_ARTICLE_WORDS = 300
-# Lookahead : le titre de l'article reste en tête de sa section
-ARTICLE_START = re.compile(r"(?m)^(?=Article \d+ — )")
-
-Variant = Literal["none", "prefix", "prefix_article", "header"]
-PREFIXED_VARIANTS = ("prefix", "prefix_article", "header")
+# Lu par l'éval pour refuser une collection ingérée autrement
+INGESTION_VARIANT = "header"
 
 
 def default_clients() -> tuple[voyageai.Client, QdrantClient]:
@@ -60,29 +53,6 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
         chunks.append(chunk)
         start += chunk_size - overlap
     return [c for c in chunks if len(c.strip()) > 50]
-
-
-def chunk_by_article(text: str, max_words: int = MAX_ARTICLE_WORDS) -> list[str]:
-    """Une section par « Article N — » ; texte sans article : découpage à taille fixe."""
-
-    sections = ARTICLE_START.split(text)
-    # Guard - sans article (Résumés, FAQ), on garde le découpage historique
-    if len(sections) == 1:
-        return chunk_text(text)
-    chunks: list[str] = []
-    for section in sections:
-        words = section.split()
-        if not words:
-            continue
-        if len(words) <= max_words:
-            chunks.append(" ".join(words))
-            continue
-        head, _, body = section.partition("\n")
-        # Le préambule n'a pas de titre à répéter ; un article oui
-        title = head.strip() if head.startswith("Article ") else ""
-        pieces = chunk_text(body if title else section)
-        chunks.extend(f"{title} {piece}".strip() for piece in pieces)
-    return chunks
 
 
 # ─── Métadonnées ─────────────────────────────────────────────────────────────
@@ -116,15 +86,12 @@ def upsert_chunks(
     chunks: list[str],
     embeddings: list[list[float]],
     pdf_path: Path,
-    variant: Variant,
+    header: str,
     collection: str = COLLECTION_NAME,
-    header: str | None = None,
 ) -> None:
     """Insère les chunks bruts + embeddings + métadonnées dans Qdrant."""
 
     doc_type = doc_type_from_filename(pdf_path.name)
-    # Le header reste hors de "text" : le matcher des points obligatoires lit le texte brut
-    extra = {"header": header} if header is not None else {}
     points = []
     for i, (chunk, vector) in enumerate(zip(chunks, embeddings)):
         points.append(
@@ -137,22 +104,22 @@ def upsert_chunks(
                     "doc_id": pdf_path.stem,
                     "doc_type": doc_type,
                     "chunk_index": i,
-                    # Lu par l'éval pour refuser un label qui ne correspond pas à l'index
-                    "ingestion_variant": variant,
-                    **extra,
+                    "ingestion_variant": INGESTION_VARIANT,
+                    # Hors de "text" : le matcher des points obligatoires lit le texte brut
+                    "header": header,
                 },
             )
         )
     qdrant.upsert(collection_name=collection, points=points)
 
 
-# ─── Préfixe de contexte ─────────────────────────────────────────────────────
+# ─── Header de contexte ──────────────────────────────────────────────────────
 
 
-def embedding_text(chunk: str, prefix: str) -> str:
-    """Texte envoyé à l'embedding : préfixe, saut de ligne, chunk brut."""
+def embedding_text(chunk: str, header: str) -> str:
+    """Texte envoyé à l'embedding : header, saut de ligne, chunk brut."""
 
-    return f"{prefix}\n{chunk}"
+    return f"{header}\n{chunk}"
 
 
 def document_header(text: str, pdf_path: Path) -> str:
@@ -160,20 +127,9 @@ def document_header(text: str, pdf_path: Path) -> str:
 
     doc_type = doc_type_from_filename(pdf_path.name)
     if doc_type == "resume_contrat":
-        return build_chunk_header(
-            "", doc_type, extract_contract_info(text, pdf_path.name), pdf_path.name
-        )
-    return build_chunk_header(extract_title(text, pdf_path.name), doc_type, None, pdf_path.name)
-
-
-def document_prefix(text: str, pdf_path: Path) -> str:
-    """Préfixe de contexte d'un document ; lève PrefixConstructionError plutôt que de dégrader."""
-
-    doc_type = doc_type_from_filename(pdf_path.name)
-    if doc_type == "resume_contrat":
         contract = extract_contract_info(text, pdf_path.name)
-        return build_context_prefix("", doc_type, contract)
-    return build_context_prefix(extract_title(text, pdf_path.name), doc_type, None)
+        return build_chunk_header("", doc_type, contract, pdf_path.name)
+    return build_chunk_header(extract_title(text, pdf_path.name), doc_type, None, pdf_path.name)
 
 
 # ─── Pipeline principal ───────────────────────────────────────────────────────
@@ -183,35 +139,29 @@ def ingest_pdf(
     pdf_path: Path,
     voyage: voyageai.Client,
     qdrant: QdrantClient,
-    variant: Variant = "none",
     collection: str = COLLECTION_NAME,
-) -> tuple[int, int]:
-    """Ingère un seul PDF. Retourne (chunks insérés, chunks dont l'embedding est préfixé)."""
+) -> int:
+    """Ingère un seul PDF (embedding header + chunk, payload brut) ; retourne le nb de chunks."""
 
     text = extract_text(pdf_path)
     if not text.strip():
         print(f"  ⚠ Texte vide : {pdf_path.name}")
-        return 0, 0
-    chunks = chunk_by_article(text) if variant == "prefix_article" else chunk_text(text)
-    header = document_header(text, pdf_path) if variant == "header" else None
-    if variant in PREFIXED_VARIANTS:
-        prefix = header if header is not None else document_prefix(text, pdf_path)
-        embedded = [embedding_text(c, prefix) for c in chunks]
-    else:
-        embedded = chunks
+        return 0
+    chunks = chunk_text(text)
+    header = document_header(text, pdf_path)
+    embedded = [embedding_text(c, header) for c in chunks]
     result = voyage.embed(embedded, model=EMBEDDING_MODEL, input_type="document")
     embeddings = [[float(x) for x in vector] for vector in result.embeddings]
-    upsert_chunks(qdrant, chunks, embeddings, pdf_path, variant, collection, header)
-    return len(chunks), len(chunks) if variant in PREFIXED_VARIANTS else 0
+    upsert_chunks(qdrant, chunks, embeddings, pdf_path, header, collection)
+    return len(chunks)
 
 
 def ingest_corpus(
     corpus_dir: Path = CORPUS_DIR,
-    variant: Variant = "none",
     clients: tuple[voyageai.Client, QdrantClient] | None = None,
     collection: str = COLLECTION_NAME,
 ) -> int:
-    """Ingère tous les PDFs du corpus et affiche les chunks préfixés par type. Retourne le total."""
+    """Ingère tous les PDFs du corpus et affiche les chunks par type. Retourne le total."""
 
     voyage, qdrant = clients or default_clients()
     ensure_collection(qdrant, collection)
@@ -219,18 +169,16 @@ def ingest_corpus(
     if not pdfs:
         print(f"Aucun PDF trouvé dans {corpus_dir}")
         return 0
-    print(f"\n{len(pdfs)} PDFs à ingérer (variante : {variant})...\n")
-    per_type: dict[str, list[int]] = defaultdict(lambda: [0, 0])
+    print(f"\n{len(pdfs)} PDFs à ingérer (collection : {collection})...\n")
+    per_type: dict[str, int] = defaultdict(int)
     for pdf_path in pdfs:
-        n, n_prefixed = ingest_pdf(pdf_path, voyage, qdrant, variant, collection)
-        stats = per_type[doc_type_from_filename(pdf_path.name)]
-        stats[0] += n
-        stats[1] += n_prefixed
+        n = ingest_pdf(pdf_path, voyage, qdrant, collection)
+        per_type[doc_type_from_filename(pdf_path.name)] += n
         print(f"  ✓ {pdf_path.name} — {n} chunks")
-    print("\nChunks préfixés / chunks, par type de document :")
-    for doc_type, (n, n_prefixed) in sorted(per_type.items()):
-        print(f"  {doc_type}: {n_prefixed}/{n}")
-    total = sum(n for n, _ in per_type.values())
+    print("\nChunks par type de document :")
+    for doc_type, n in sorted(per_type.items()):
+        print(f"  {doc_type}: {n}")
+    total = sum(per_type.values())
     print(f"\n✅ Ingestion terminée : {total} chunks dans Qdrant")
     return total
 
@@ -244,24 +192,20 @@ def recreate_collection(qdrant: QdrantClient, collection: str = COLLECTION_NAME)
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Point d'entrée CLI : --variant choisit l'embedding, --recreate vide l'index avant."""
+    """Point d'entrée CLI : --collection choisit la cible, --recreate vide l'index avant."""
 
     parser = argparse.ArgumentParser(description="Ingestion du corpus PrevCorp dans Qdrant")
     parser.add_argument(
-        "--variant", choices=["none", "prefix", "prefix_article", "header"], default="none"
-    )
-    parser.add_argument(
-        "--collection", default=COLLECTION_NAME, help="collection cible (défaut : prevcorp_docs)"
+        "--collection",
+        default=COLLECTION_NAME,
+        help=f"collection cible (défaut : {COLLECTION_NAME})",
     )
     parser.add_argument("--recreate", action="store_true", help="supprime la collection avant")
     args = parser.parse_args(argv)
-    # Guard - la variante header est un test A/B : elle ne doit jamais écraser la baseline
-    if args.variant == "header" and args.collection == COLLECTION_NAME:
-        parser.error(f"--variant header exige --collection différente de {COLLECTION_NAME}")
     clients = default_clients()
     if args.recreate:
         recreate_collection(clients[1], args.collection)
-    ingest_corpus(variant=args.variant, clients=clients, collection=args.collection)
+    ingest_corpus(clients=clients, collection=args.collection)
     return 0
 
 

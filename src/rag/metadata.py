@@ -92,17 +92,6 @@ def extract_contract_info(text: str, filename: str) -> ContractInfo:
     return ContractInfo(contract_id=contract.group(1), ccn=ccn, category=parts[-1].strip())
 
 
-def build_context_prefix(title: str, doc_type: str, contract: ContractInfo | None) -> str:
-    """Construit le préfixe de contexte sans doc_id (le nom de fichier peut trahir le rôle)."""
-
-    if contract is not None:
-        return (
-            f"[{contract.contract_id} | {DOC_TYPE_LABELS['resume_contrat']} | "
-            f"Contrat {contract.contract_id} — {contract.ccn}, {contract.category}]"
-        )
-    return f"[{title} | {DOC_TYPE_LABELS.get(doc_type, DOC_TYPE_LABELS['autre'])}]"
-
-
 MAX_HEADER_CHARS = 150
 
 

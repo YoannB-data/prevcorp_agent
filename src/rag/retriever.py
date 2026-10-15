@@ -25,6 +25,7 @@ def retrieve(
     question: str,
     top_k: int = TOP_K,
     doc_type: str | None = None,
+    collection: str = COLLECTION_NAME,
 ) -> list[dict]:
     """
     Recherche les chunks les plus pertinents pour une question.
@@ -32,6 +33,7 @@ def retrieve(
     Args:
         question: question en langage naturel
         top_k: nombre de chunks à retourner
+        collection: collection Qdrant interrogée (défaut : la collection de prod)
         doc_type: filtre optionnel sur le type de document
                   (conditions_generales, fiche_parametrage, faq, note_technique, circulaire)
 
@@ -48,7 +50,7 @@ def retrieve(
         )
 
     hits = qdrant_client.query_points(
-        collection_name=COLLECTION_NAME,
+        collection_name=collection,
         query=query_vector,
         limit=top_k,
         query_filter=search_filter,
