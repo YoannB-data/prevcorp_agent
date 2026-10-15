@@ -11,6 +11,7 @@ from src.rag.evaluation.adapters import check_variant, collection_variant
 from src.rag.metadata import (
     ContractInfo,
     PrefixConstructionError,
+    build_chunk_header,
     build_context_prefix,
     doc_type_from_filename,
     extract_contract_info,
@@ -219,6 +220,11 @@ def test_header_une_ligne_150_caracteres_max_sur_les_vrais_pdf():
         assert "\n" not in header
         assert len(header) <= 150
         assert pdf.stem not in header
+
+
+def test_header_trop_long_leve_au_lieu_de_tronquer():
+    with pytest.raises(PrefixConstructionError, match=r"RESUME_X\.pdf.*\(\d+ > 150"):
+        build_chunk_header("T" * 200, "reglement", None, "RESUME_X.pdf")
 
 
 def test_variante_none_et_prefix_sans_champ_header(monkeypatch):

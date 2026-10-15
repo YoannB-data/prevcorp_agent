@@ -106,7 +106,9 @@ def build_context_prefix(title: str, doc_type: str, contract: ContractInfo | Non
 MAX_HEADER_CHARS = 150
 
 
-def build_chunk_header(title: str, doc_type: str, contract: ContractInfo | None) -> str:
+def build_chunk_header(
+    title: str, doc_type: str, contract: ContractInfo | None, filename: str
+) -> str:
     """Header d'une ligne (150 caractères max) ; le doc_id est exclu, il peut trahir le rôle."""
 
     label = DOC_TYPE_LABELS.get(doc_type, DOC_TYPE_LABELS["autre"])
@@ -120,7 +122,9 @@ def build_chunk_header(title: str, doc_type: str, contract: ContractInfo | None)
     else:
         parts = [f"Document : {title}", f"Type : {label}"]
     header = " | ".join(parts)
-    # Troncature sur une frontière de mot pour ne pas couper une valeur en deux
-    return (
-        header if len(header) <= MAX_HEADER_CHARS else header[:MAX_HEADER_CHARS].rsplit(" ", 1)[0]
-    )
+    # Guard - une troncature couperait une valeur ; mieux vaut échouer avant d'embedder
+    if len(header) > MAX_HEADER_CHARS:
+        raise PrefixConstructionError(
+            f"header de {filename} trop long ({len(header)} > {MAX_HEADER_CHARS} caractères)"
+        )
+    return header

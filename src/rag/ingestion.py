@@ -160,8 +160,10 @@ def document_header(text: str, pdf_path: Path) -> str:
 
     doc_type = doc_type_from_filename(pdf_path.name)
     if doc_type == "resume_contrat":
-        return build_chunk_header("", doc_type, extract_contract_info(text, pdf_path.name))
-    return build_chunk_header(extract_title(text, pdf_path.name), doc_type, None)
+        return build_chunk_header(
+            "", doc_type, extract_contract_info(text, pdf_path.name), pdf_path.name
+        )
+    return build_chunk_header(extract_title(text, pdf_path.name), doc_type, None, pdf_path.name)
 
 
 def document_prefix(text: str, pdf_path: Path) -> str:
