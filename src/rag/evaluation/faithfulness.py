@@ -8,6 +8,7 @@ from pathlib import Path
 
 import anthropic
 
+from src.config import sampling_kwargs
 from src.rag.evaluation.judge import AnthropicJudge, parse_verdicts
 from src.rag.evaluation.models import RetrievedChunk
 from src.rag.evaluation.report import TYPES
@@ -95,7 +96,7 @@ def _ask(judge: AnthropicJudge, system: str, user_message: str) -> str:
     response = judge.client.messages.create(
         model=judge.model,
         max_tokens=FAITHFULNESS_MAX_TOKENS,
-        temperature=0,
+        **sampling_kwargs(judge.model, 0),
         system=system,
         messages=[{"role": "user", "content": user_message}],
     )

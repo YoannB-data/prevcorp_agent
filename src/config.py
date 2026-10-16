@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -41,20 +42,43 @@ MODEL_PRICES: dict[str, tuple[float, float]] = {
 }
 
 
-def _validate_prices(roles: dict[str, str], prices: dict[str, tuple[float, float]]) -> None:
-    """Vérifie que chaque rôle a un tarif ; lève ValueError sinon."""
-
-    # Guard - un modèle sans tarif doit faire échouer le démarrage, pas un appel API déjà facturé
-    missing = {role: model for role, model in roles.items() if model not in prices}
-    if missing:
-        detail = ", ".join(f"{role}={model!r}" for role, model in missing.items())
-        raise ValueError(f"Modèle(s) sans tarif dans MODEL_PRICES : {detail}")
+# Capacités d'appel par modèle. Sonnet 5.5 renvoie un 400 sur temperature non défaut :
+# https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide (section Breaking changes)
+MODEL_PARAMS: dict[str, dict[str, bool]] = {
+    "claude-sonnet-4-6": {"supports_temperature": True},
+    "claude-sonnet-5-5": {"supports_temperature": False},
+}
 
 
-_validate_prices(
+def _validate_models(
+    roles: dict[str, str],
+    prices: dict[str, tuple[float, float]],
+    params: dict[str, dict[str, bool]],
+) -> None:
+    """Vérifie que chaque rôle a un tarif et des paramètres d'appel ; lève ValueError sinon."""
+
+    # Guard - un modèle inconnu doit faire échouer le démarrage, pas un appel API déjà facturé
+    for table_name, table in (("MODEL_PRICES", prices), ("MODEL_PARAMS", params)):
+        missing = {role: model for role, model in roles.items() if model not in table}
+        if missing:
+            detail = ", ".join(f"{role}={model!r}" for role, model in missing.items())
+            raise ValueError(f"Modèle(s) absent(s) de {table_name} : {detail}")
+
+
+_validate_models(
     {"AGENT_MODEL": AGENT_MODEL, "ROUTER_MODEL": ROUTER_MODEL, "JUDGE_MODEL": JUDGE_MODEL},
     MODEL_PRICES,
+    MODEL_PARAMS,
 )
+
+
+def sampling_kwargs(model: str, temperature: float) -> dict[str, Any]:
+    """Kwargs d'échantillonnage acceptés par le modèle ; ValueError si le modèle est inconnu."""
+
+    # Guard - un --judge-model hors table échoue ici, avant tout appel API
+    if model not in MODEL_PARAMS:
+        raise ValueError(f"Modèle absent de MODEL_PARAMS : {model!r}")
+    return {"temperature": temperature} if MODEL_PARAMS[model]["supports_temperature"] else {}
 
 
 def compute_cost(model: str, input_tokens: int, output_tokens: int) -> float:

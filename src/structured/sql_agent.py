@@ -57,7 +57,7 @@ def _call_llm_with_retry(
             response = client.messages.create(
                 model=config.AGENT_MODEL,
                 max_tokens=config.MAX_TOKENS,
-                temperature=0,
+                **config.sampling_kwargs(config.AGENT_MODEL, 0),
                 system=system_prompt,
                 messages=[{"role": "user", "content": message}],
             )

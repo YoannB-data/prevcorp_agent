@@ -5,7 +5,7 @@ Génération augmentée — question + chunks → réponse avec citations
 import anthropic
 from dotenv import load_dotenv
 
-from src.config import AGENT_MODEL, ANTHROPIC_API_KEY, MAX_TOKENS
+from src.config import AGENT_MODEL, ANTHROPIC_API_KEY, MAX_TOKENS, sampling_kwargs
 from src.rag.retriever import retrieve
 
 load_dotenv()
@@ -53,7 +53,7 @@ Question : {question}"""
         max_tokens=MAX_TOKENS,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_message}],
-        temperature=anthropic.omit if temperature is None else temperature,
+        **({} if temperature is None else sampling_kwargs(AGENT_MODEL, temperature)),
     )
 
     text_block = response.content[0]

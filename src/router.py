@@ -25,7 +25,7 @@ def route(question: str) -> Literal["sql", "rag"]:
     response = client.messages.create(
         model=config.ROUTER_MODEL,
         max_tokens=16,
-        temperature=0,
+        **config.sampling_kwargs(config.ROUTER_MODEL, 0),
         system=_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": question}],
     )

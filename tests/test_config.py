@@ -38,13 +38,54 @@ def test_validation_leve_valueerror_nommant_le_role_sans_tarif():
     """Le démarrage échoue avec le rôle et le modèle fautifs."""
 
     with pytest.raises(ValueError, match=r"JUDGE_MODEL='claude-inconnu'"):
-        config._validate_prices(
+        config._validate_models(
             {"AGENT_MODEL": "claude-sonnet-4-6", "JUDGE_MODEL": "claude-inconnu"},
             config.MODEL_PRICES,
+            config.MODEL_PARAMS,
         )
 
 
 def test_validation_passe_quand_tous_les_roles_ont_un_tarif():
     """Aucune erreur si la table couvre tous les rôles."""
 
-    config._validate_prices({"AGENT_MODEL": "claude-sonnet-5-5"}, config.MODEL_PRICES)
+    config._validate_models(
+        {"AGENT_MODEL": "claude-sonnet-5-5"}, config.MODEL_PRICES, config.MODEL_PARAMS
+    )
+
+
+def test_validation_leve_valueerror_si_modele_sans_parametres():
+    """Un modèle tarifé mais absent de MODEL_PARAMS fait échouer le démarrage."""
+
+    prices = {**config.MODEL_PRICES, "claude-sans-params": (1.0, 2.0)}
+    with pytest.raises(ValueError, match=r"MODEL_PARAMS : ROUTER_MODEL='claude-sans-params'"):
+        config._validate_models({"ROUTER_MODEL": "claude-sans-params"}, prices, config.MODEL_PARAMS)
+
+
+def test_sampling_kwargs_modele_avec_temperature():
+    """Sonnet 4.6 reçoit temperature."""
+
+    assert config.sampling_kwargs("claude-sonnet-4-6", 0) == {"temperature": 0}
+
+
+def test_sampling_kwargs_modele_sans_temperature():
+    """Sonnet 5.5 n'en reçoit aucun (non défaut = 400)."""
+
+    assert config.sampling_kwargs("claude-sonnet-5-5", 0) == {}
+
+
+def test_sampling_kwargs_modele_inconnu_leve_valueerror():
+    """Pas de défaut silencieux pour un modèle hors table."""
+
+    with pytest.raises(ValueError, match="MODEL_PARAMS"):
+        config.sampling_kwargs("claude-inconnu", 0)
+
+
+def test_juge_garde_temperature_0_sur_46():
+    """Le juge sur 4.6 envoie temperature=0 ; construit à l'init, donc échoue tôt si inconnu."""
+
+    from src.rag.evaluation.judge import AnthropicJudge
+
+    judge = AnthropicJudge(None, config.JUDGE_MODEL)  # type: ignore[arg-type]
+    assert judge.sampling == {"temperature": 0}
+    with pytest.raises(ValueError):
+        AnthropicJudge(None, "claude-inconnu")  # type: ignore[arg-type]
