@@ -34,3 +34,17 @@ def test_reponse_sans_bloc_text_leve_avec_types_et_stop_reason():
     resp = _response([_block("thinking", thinking="...")], stop_reason="max_tokens")
     with pytest.raises(ValueError, match=r"blocs=\['thinking'\], stop_reason='max_tokens'"):
         extract_text(resp)
+
+
+def test_thinking_tokens_dict_objet_et_absent():
+    """Trois formes possibles de usage.output_tokens_details."""
+
+    from src.llm import extract_thinking_tokens
+
+    def usage(details):
+        return SimpleNamespace(usage=SimpleNamespace(output_tokens_details=details))
+
+    assert extract_thinking_tokens(usage({"thinking_tokens": 154})) == 154
+    assert extract_thinking_tokens(usage(SimpleNamespace(thinking_tokens=7))) == 7
+    assert extract_thinking_tokens(SimpleNamespace(usage=SimpleNamespace())) == 0
+    assert extract_thinking_tokens(usage(None)) == 0

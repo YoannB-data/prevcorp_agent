@@ -89,3 +89,41 @@ def test_juge_garde_temperature_0_sur_46():
     assert judge.sampling == {"temperature": 0}
     with pytest.raises(ValueError):
         AnthropicJudge(None, "claude-inconnu")  # type: ignore[arg-type]
+
+
+def test_agent_call_kwargs_55_default_sans_champ_thinking(monkeypatch):
+    """5.5 en mode default : max_tokens 4096, ni thinking ni temperature."""
+
+    monkeypatch.setattr(config, "AGENT_MODEL", "claude-sonnet-5-5")
+    assert config.agent_call_kwargs(temperature=0) == {"max_tokens": 4096}
+
+
+def test_agent_call_kwargs_between_tools(monkeypatch):
+    """La variante between_tools ajoute le champ thinking, sans toucher au code."""
+
+    monkeypatch.setattr(config, "AGENT_MODEL", "claude-sonnet-5-5")
+    monkeypatch.setattr(config, "AGENT_THINKING_MODE", "between_tools")
+    assert config.agent_call_kwargs(temperature=0) == {
+        "max_tokens": 4096,
+        "thinking": {"type": "between_tools"},
+    }
+
+
+def test_agent_call_kwargs_modele_avec_temperature(monkeypatch):
+    """Sur 4.6, temperature est transmise et max_tokens reste à 1024."""
+
+    monkeypatch.setattr(config, "AGENT_MODEL", "claude-sonnet-4-6")
+    assert config.agent_call_kwargs(temperature=0) == {"max_tokens": 1024, "temperature": 0}
+    assert config.agent_call_kwargs() == {"max_tokens": 1024}
+
+
+def test_mode_thinking_inconnu_leve_au_demarrage(monkeypatch):
+    """Un AGENT_THINKING_MODE invalide fait échouer l'import de config."""
+
+    import importlib
+
+    monkeypatch.setenv("AGENT_THINKING_MODE", "nimporte")
+    with pytest.raises(ValueError, match="AGENT_THINKING_MODE"):
+        importlib.reload(config)
+    monkeypatch.delenv("AGENT_THINKING_MODE")
+    importlib.reload(config)

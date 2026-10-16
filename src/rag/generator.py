@@ -2,15 +2,18 @@
 Génération augmentée — question + chunks → réponse avec citations
 """
 
+import logging
+
 import anthropic
 from dotenv import load_dotenv
 
-from src.config import AGENT_MODEL, ANTHROPIC_API_KEY, MAX_TOKENS, sampling_kwargs
+from src.config import AGENT_MODEL, ANTHROPIC_API_KEY, agent_call_kwargs
 from src.llm import extract_text
 from src.rag.retriever import retrieve
 
 load_dotenv()
 
+_logger = logging.getLogger(__name__)
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 SYSTEM_PROMPT = """Tu es un assistant expert en assurance prévoyance pour PrevCorp.
@@ -51,11 +54,13 @@ Question : {question}"""
     # Le défaut de l'API n'est pas 0 : l'éval fixe temperature=0, la prod garde le défaut
     response = client.messages.create(
         model=AGENT_MODEL,
-        max_tokens=MAX_TOKENS,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_message}],
-        **({} if temperature is None else sampling_kwargs(AGENT_MODEL, temperature)),
+        **agent_call_kwargs(temperature),
     )
+    # Une réponse tronquée serait évaluée comme une mauvaise réponse sans signal dans le rapport
+    if response.stop_reason == "max_tokens":
+        _logger.warning("TRONQUÉ (stop_reason=max_tokens) pour la question : %s", question[:80])
 
     return extract_text(response)
 

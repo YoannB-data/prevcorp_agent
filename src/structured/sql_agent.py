@@ -3,12 +3,13 @@
 import re
 import time
 from pathlib import Path
+from typing import NamedTuple
 
 import anthropic
 import pandas as pd
 
 from src import config
-from src.llm import extract_text
+from src.llm import extract_text, extract_thinking_tokens
 from src.logger import log_interaction
 from src.structured.duckdb_executor import execute_query
 from src.structured.few_shot_selector import format_few_shot, select_examples
@@ -44,9 +45,17 @@ def _format_metrics(metrics: dict) -> str:
     return "\n".join(lines)
 
 
-def _call_llm_with_retry(
-    system_prompt: str, message: str, max_retries: int
-) -> tuple[str, int, int]:
+class _LLMCall(NamedTuple):
+    """Texte et métriques d'un appel réussi ; thinking_tokens est inclus dans output_tokens."""
+
+    text: str
+    input_tokens: int
+    output_tokens: int
+    thinking_tokens: int
+    stop_reason: str | None
+
+
+def _call_llm_with_retry(system_prompt: str, message: str, max_retries: int) -> _LLMCall:
     """Envoie un message à l'API Anthropic avec retry sur erreurs transitoires."""
 
     if max_retries < 1:
@@ -57,15 +66,16 @@ def _call_llm_with_retry(
         try:
             response = client.messages.create(
                 model=config.AGENT_MODEL,
-                max_tokens=config.MAX_TOKENS,
-                **config.sampling_kwargs(config.AGENT_MODEL, 0),
+                **config.agent_call_kwargs(temperature=0),
                 system=system_prompt,
                 messages=[{"role": "user", "content": message}],
             )
-            return (
-                extract_text(response),
-                response.usage.input_tokens,
-                response.usage.output_tokens,
+            return _LLMCall(
+                text=extract_text(response),
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+                thinking_tokens=extract_thinking_tokens(response),
+                stop_reason=response.stop_reason,
             )
         except anthropic.AuthenticationError:
             raise  # clé invalide : pas transitoire, retry inutile
@@ -123,14 +133,16 @@ def agent_main(question: str, eval_question_id: str | None = None) -> tuple[str,
     sql_generated = None
     input_tokens = 0
     output_tokens = 0
+    thinking_tokens = 0
+    stop_reason: str | None = None
     df: pd.DataFrame | None = None
 
     try:
         for attempt in range(_MAX_RETRIES):
-            text, input_tokens, output_tokens = _call_llm_with_retry(
-                _SYSTEM_PROMPT, message_to_llm, _MAX_RETRIES
-            )
-            sql_generated = _extract_sql(text)
+            call = _call_llm_with_retry(_SYSTEM_PROMPT, message_to_llm, _MAX_RETRIES)
+            input_tokens, output_tokens = call.input_tokens, call.output_tokens
+            thinking_tokens, stop_reason = call.thinking_tokens, call.stop_reason
+            sql_generated = _extract_sql(call.text)
             # print(f"[debug] SQL généré : {sql_generated}")
             try:
                 df = execute_query(sql_generated)
@@ -147,6 +159,8 @@ def agent_main(question: str, eval_question_id: str | None = None) -> tuple[str,
             latency_ms=int((time.perf_counter() - start) * 1000),
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            thinking_tokens=thinking_tokens,
+            stop_reason=stop_reason,
             cost_usd=config.compute_cost(config.AGENT_MODEL, input_tokens, output_tokens),
             eval_question_id=eval_question_id,
         )
@@ -162,6 +176,8 @@ def agent_main(question: str, eval_question_id: str | None = None) -> tuple[str,
             latency_ms=int((time.perf_counter() - start) * 1000),
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            thinking_tokens=thinking_tokens,
+            stop_reason=stop_reason,
             cost_usd=config.compute_cost(config.AGENT_MODEL, input_tokens, output_tokens),
             error_message=str(e),
             eval_question_id=eval_question_id,
