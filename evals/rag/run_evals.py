@@ -26,7 +26,7 @@ def main() -> int:
         default="header",
         help="variante d'ingestion attendue, vérifiée contre la collection",
     )
-    parser.add_argument("--judge-model", default=None, help="modèle du juge (défaut : MODEL)")
+    parser.add_argument("--judge-model", default=None, help="modèle du juge (défaut : JUDGE_MODEL)")
     parser.add_argument("--ids", nargs="*", metavar="ID", help="IDs à évaluer (ex: RC01 RC17)")
     args = parser.parse_args()
 
