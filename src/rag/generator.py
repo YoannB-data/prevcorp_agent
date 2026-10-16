@@ -6,6 +6,7 @@ import anthropic
 from dotenv import load_dotenv
 
 from src.config import AGENT_MODEL, ANTHROPIC_API_KEY, MAX_TOKENS, sampling_kwargs
+from src.llm import extract_text
 from src.rag.retriever import retrieve
 
 load_dotenv()
@@ -56,9 +57,7 @@ Question : {question}"""
         **({} if temperature is None else sampling_kwargs(AGENT_MODEL, temperature)),
     )
 
-    text_block = response.content[0]
-    assert isinstance(text_block, anthropic.types.TextBlock)
-    return text_block.text
+    return extract_text(response)
 
 
 def generate(question: str, top_k: int = 5, doc_type: str | None = None) -> dict:

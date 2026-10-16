@@ -5,6 +5,7 @@ from typing import Literal, cast
 import anthropic
 
 from src import config
+from src.llm import extract_text
 
 _SYSTEM_PROMPT = """\
 Tu es un routeur pour un assistant spécialisé en prévoyance collective d'entreprise.
@@ -29,9 +30,7 @@ def route(question: str) -> Literal["sql", "rag"]:
         system=_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": question}],
     )
-    text_block = response.content[0]
-    assert isinstance(text_block, anthropic.types.TextBlock)
-    label = text_block.text.strip().lower()
+    label = extract_text(response).strip().lower()
     if label not in ("sql", "rag"):
         raise ValueError(f"Réponse inattendue du routeur : {label!r}")
     return cast(Literal["sql", "rag"], label)

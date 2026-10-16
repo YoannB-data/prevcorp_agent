@@ -8,6 +8,7 @@ import anthropic
 import pandas as pd
 
 from src import config
+from src.llm import extract_text
 from src.logger import log_interaction
 from src.structured.duckdb_executor import execute_query
 from src.structured.few_shot_selector import format_few_shot, select_examples
@@ -61,10 +62,8 @@ def _call_llm_with_retry(
                 system=system_prompt,
                 messages=[{"role": "user", "content": message}],
             )
-            text_block = response.content[0]
-            assert isinstance(text_block, anthropic.types.TextBlock)
             return (
-                text_block.text,
+                extract_text(response),
                 response.usage.input_tokens,
                 response.usage.output_tokens,
             )
