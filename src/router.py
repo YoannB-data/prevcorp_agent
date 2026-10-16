@@ -23,7 +23,7 @@ def route(question: str) -> Literal["sql", "rag"]:
 
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
     response = client.messages.create(
-        model=config.MODEL,
+        model=config.ROUTER_MODEL,
         max_tokens=16,
         temperature=0,
         system=_SYSTEM_PROMPT,

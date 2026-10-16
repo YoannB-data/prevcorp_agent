@@ -63,7 +63,7 @@ def _to_dict(chunk: RetrievedChunk) -> dict:
 def build_deps(judge_model: str | None = None, collection: str | None = None) -> Deps:
     """Construit les dépendances réelles ; imports paresseux (Qdrant local verrouille le disque)."""
 
-    from src.config import ANTHROPIC_API_KEY, MODEL
+    from src.config import AGENT_MODEL, ANTHROPIC_API_KEY, JUDGE_MODEL
     from src.rag import generator, retriever
 
     target = collection or retriever.COLLECTION_NAME
@@ -127,7 +127,7 @@ def build_deps(judge_model: str | None = None, collection: str | None = None) ->
     if not valid_doc_ids:
         raise ValueError("collection sans doc_id : ré-ingérer le corpus (src/rag/ingestion.py)")
 
-    chosen_judge_model = judge_model or MODEL
+    chosen_judge_model = judge_model or JUDGE_MODEL
     judge = AnthropicJudge(anthropic.Anthropic(api_key=ANTHROPIC_API_KEY), chosen_judge_model)
     return Deps(
         retrieve=retrieve,
@@ -135,7 +135,7 @@ def build_deps(judge_model: str | None = None, collection: str | None = None) ->
         fetch_doc_chunks=fetch_doc_chunks,
         judge=judge,
         valid_doc_ids=valid_doc_ids,
-        model=MODEL,
+        model=AGENT_MODEL,
         judge_model=chosen_judge_model,
         collection_variant=collection_variant(payloads),
     )

@@ -5,7 +5,7 @@ Génération augmentée — question + chunks → réponse avec citations
 import anthropic
 from dotenv import load_dotenv
 
-from src.config import ANTHROPIC_API_KEY, MAX_TOKENS, MODEL
+from src.config import AGENT_MODEL, ANTHROPIC_API_KEY, MAX_TOKENS
 from src.rag.retriever import retrieve
 
 load_dotenv()
@@ -49,7 +49,7 @@ Question : {question}"""
 
     # Le défaut de l'API n'est pas 0 : l'éval fixe temperature=0, la prod garde le défaut
     response = client.messages.create(
-        model=MODEL,
+        model=AGENT_MODEL,
         max_tokens=MAX_TOKENS,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_message}],

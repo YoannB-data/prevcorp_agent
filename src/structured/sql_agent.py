@@ -55,7 +55,7 @@ def _call_llm_with_retry(
     for attempt in range(max_retries):
         try:
             response = client.messages.create(
-                model=config.MODEL,
+                model=config.AGENT_MODEL,
                 max_tokens=config.MAX_TOKENS,
                 temperature=0,
                 system=system_prompt,
@@ -148,8 +148,7 @@ def agent_main(question: str, eval_question_id: str | None = None) -> tuple[str,
             latency_ms=int((time.perf_counter() - start) * 1000),
             input_tokens=input_tokens,
             output_tokens=output_tokens,
-            cost_usd=(input_tokens * config.COST_PER_INPUT_TOKEN)
-            + (output_tokens * config.COST_PER_OUTPUT_TOKEN),
+            cost_usd=config.compute_cost(config.AGENT_MODEL, input_tokens, output_tokens),
             eval_question_id=eval_question_id,
         )
         assert sql_generated is not None and df is not None
@@ -164,8 +163,7 @@ def agent_main(question: str, eval_question_id: str | None = None) -> tuple[str,
             latency_ms=int((time.perf_counter() - start) * 1000),
             input_tokens=input_tokens,
             output_tokens=output_tokens,
-            cost_usd=(input_tokens * config.COST_PER_INPUT_TOKEN)
-            + (output_tokens * config.COST_PER_OUTPUT_TOKEN),
+            cost_usd=config.compute_cost(config.AGENT_MODEL, input_tokens, output_tokens),
             error_message=str(e),
             eval_question_id=eval_question_id,
         )

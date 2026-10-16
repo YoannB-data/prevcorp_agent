@@ -18,7 +18,9 @@ def _require_env(name: str) -> str:
 
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-MODEL = "claude-sonnet-4-6"
+AGENT_MODEL = "claude-sonnet-4-6"  # agent SQL + générateur RAG
+ROUTER_MODEL = "claude-sonnet-4-6"
+JUDGE_MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 1024
 
 SEMANTIC_MANIFEST_PATH = Path(_require_env("SEMANTIC_MANIFEST_PATH"))
@@ -29,6 +31,18 @@ LOGS_JSONL_PATH = Path("logs/interactions.jsonl")
 
 LATEST_EVAL_PATH = Path(__file__).parent.parent / "evals" / "reports" / "latest.json"
 
-# Pricing Anthropic — claude-sonnet-4-6
-COST_PER_INPUT_TOKEN: float = 3.0 / 1_000_000  # $3 / 1M tokens
-COST_PER_OUTPUT_TOKEN: float = 15.0 / 1_000_000  # $15 / 1M tokens
+# Tarifs USD / 1M tokens (input, output), vérifiés le 2026-10-16 :
+# https://platform.claude.com/docs/en/about-claude/pricing (docs.claude.com y redirige)
+# Haiku 5.5 : palier "prompts jusqu'à 100 000 tokens" ; au-delà, 0.50 / 2.50
+MODEL_PRICES: dict[str, tuple[float, float]] = {
+    "claude-sonnet-4-6": (3.0, 15.0),
+    "claude-sonnet-5-5": (2.0, 10.0),
+    "claude-haiku-5-5": (0.10, 0.50),
+}
+
+
+def compute_cost(model: str, input_tokens: int, output_tokens: int) -> float:
+    """Coût en USD d'un appel ; KeyError si le modèle n'a pas de tarif."""
+
+    input_price, output_price = MODEL_PRICES[model]
+    return (input_tokens * input_price + output_tokens * output_price) / 1_000_000
