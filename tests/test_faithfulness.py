@@ -32,7 +32,7 @@ def _judge(*reponses: str) -> tuple[SimpleNamespace, list[dict]]:
         return SimpleNamespace(content=[anthropic.types.TextBlock(type="text", text=queue.pop(0))])
 
     judge = SimpleNamespace(messages=SimpleNamespace(create=create))
-    return SimpleNamespace(client=judge, model="modele-test"), appels
+    return SimpleNamespace(client=judge, model="claude-sonnet-4-6"), appels
 
 
 def test_parse_claims_json_nu():
@@ -67,7 +67,7 @@ def test_score_faithfulness_deux_appels_a_temperature_zero():
     result = score_faithfulness(judge, "q", "réponse", CHUNKS)  # type: ignore[arg-type]
     assert result.score == 0.5 and result.unsupported == ["b"]
     assert len(appels) == 2
-    assert all(a["temperature"] == 0 and a["model"] == "modele-test" for a in appels)
+    assert all(a["temperature"] == 0 and a["model"] == "claude-sonnet-4-6" for a in appels)
     assert "FAQ_prevcorp" in appels[1]["messages"][0]["content"]
 
 

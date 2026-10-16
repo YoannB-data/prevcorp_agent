@@ -6,6 +6,8 @@ from typing import Protocol
 
 import anthropic
 
+from src.config import sampling_kwargs
+from src.llm import extract_text
 from src.rag.evaluation.schema import Point, RagQuestion
 
 JUDGE_MAX_TOKENS = 512
@@ -39,6 +41,7 @@ class AnthropicJudge:
 
         self.client = client
         self.model = model
+        self.sampling = sampling_kwargs(model, 0)
 
     def evaluate(
         self, question: RagQuestion, answer_text: str, points: list[Point]
@@ -54,13 +57,11 @@ class AnthropicJudge:
         response = self.client.messages.create(
             model=self.model,
             max_tokens=JUDGE_MAX_TOKENS,
-            temperature=0,
+            **self.sampling,
             system=JUDGE_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_message}],
         )
-        block = response.content[0]
-        assert isinstance(block, anthropic.types.TextBlock)
-        return parse_verdicts(block.text, [p.id for p in points])
+        return parse_verdicts(extract_text(response), [p.id for p in points])
 
 
 def parse_verdicts(raw: str, expected_ids: list[str]) -> dict[str, bool]:

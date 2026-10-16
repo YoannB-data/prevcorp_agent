@@ -47,6 +47,6 @@ def test_evaluate_appelle_l_api_a_temperature_zero():
             "points_obligatoires": [POINTS[0].model_dump()],
         }
     )
-    judge = AnthropicJudge(client, "modele-test")  # type: ignore[arg-type]
+    judge = AnthropicJudge(client, "claude-sonnet-4-6")  # type: ignore[arg-type]
     assert judge.evaluate(question, "réponse", POINTS) == {"O0": True}
-    assert appels[0]["temperature"] == 0 and appels[0]["model"] == "modele-test"
+    assert appels[0]["temperature"] == 0 and appels[0]["model"] == "claude-sonnet-4-6"

@@ -29,7 +29,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Faithfulness maison PrevCorp")
     parser.add_argument("--yaml", type=Path, default=EVAL_FILE, help="fichier de questions")
     parser.add_argument("--k", type=int, default=DEFAULT_K, help="taille du top-k du retrieval")
-    parser.add_argument("--judge-model", default=None, help="modèle du juge (défaut : MODEL)")
+    parser.add_argument("--judge-model", default=None, help="modèle du juge (défaut : JUDGE_MODEL)")
     parser.add_argument("--ids", nargs="*", metavar="ID", help="IDs à évaluer (ex: RC01 RC25)")
     args = parser.parse_args()
 

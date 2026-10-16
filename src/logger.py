@@ -17,6 +17,8 @@ def log_interaction(
     input_tokens: int,
     output_tokens: int,
     cost_usd: float,
+    thinking_tokens: int = 0,
+    stop_reason: str | None = None,
     error_message: str | None = None,
     eval_question_id: str | None = None,
 ) -> None:
@@ -30,6 +32,8 @@ def log_interaction(
         "latency_ms": latency_ms,
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
+        "thinking_tokens": thinking_tokens,
+        "stop_reason": stop_reason,
         "cost_usd": round(cost_usd, 6),
         "error_message": error_message,
     }
