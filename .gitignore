@@ -16,3 +16,5 @@ logs/
 .env
 sandbox.*
 evals/tmp/
+evals/routing/reports/*
+!evals/routing/reports/baselines/
