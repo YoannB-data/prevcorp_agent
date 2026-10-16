@@ -32,8 +32,13 @@ Critères SQL :
 3. Difficulté cohérente avec la catégorie annoncée ? (une « jointure » qui
    n'interroge qu'une table est mal classée)
 
+Pour chaque question, cite d'abord la lecture alternative la plus plausible
+(autre étiquette, autre interprétation), puis rends ton verdict. Un lot validé
+à 100 % sans aucune lecture alternative citée est suspect : signale-le.
+
 Format de sortie, par question :
-- id : PASS / À REVOIR
+- id : lecture alternative la plus plausible (1 ligne)
+- Verdict : PASS / À REVOIR
 - Problème (1 ligne) + correction proposée
 Termine par un résumé : n questions revues, n à revoir.
 
