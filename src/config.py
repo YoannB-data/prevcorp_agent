@@ -41,8 +41,25 @@ MODEL_PRICES: dict[str, tuple[float, float]] = {
 }
 
 
+def _validate_prices(roles: dict[str, str], prices: dict[str, tuple[float, float]]) -> None:
+    """Vérifie que chaque rôle a un tarif ; lève ValueError sinon."""
+
+    # Guard - un modèle sans tarif doit faire échouer le démarrage, pas un appel API déjà facturé
+    missing = {role: model for role, model in roles.items() if model not in prices}
+    if missing:
+        detail = ", ".join(f"{role}={model!r}" for role, model in missing.items())
+        raise ValueError(f"Modèle(s) sans tarif dans MODEL_PRICES : {detail}")
+
+
+_validate_prices(
+    {"AGENT_MODEL": AGENT_MODEL, "ROUTER_MODEL": ROUTER_MODEL, "JUDGE_MODEL": JUDGE_MODEL},
+    MODEL_PRICES,
+)
+
+
 def compute_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     """Coût en USD d'un appel ; KeyError si le modèle n'a pas de tarif."""
 
+    # Le palier Haiku 5.5 au-delà de 100k tokens de prompt n'est pas géré : tarif ≤ 100k appliqué
     input_price, output_price = MODEL_PRICES[model]
     return (input_tokens * input_price + output_tokens * output_price) / 1_000_000

@@ -32,3 +32,19 @@ def test_tous_les_roles_ont_un_tarif():
 
     for model in (config.AGENT_MODEL, config.ROUTER_MODEL, config.JUDGE_MODEL):
         assert model in config.MODEL_PRICES
+
+
+def test_validation_leve_valueerror_nommant_le_role_sans_tarif():
+    """Le démarrage échoue avec le rôle et le modèle fautifs."""
+
+    with pytest.raises(ValueError, match=r"JUDGE_MODEL='claude-inconnu'"):
+        config._validate_prices(
+            {"AGENT_MODEL": "claude-sonnet-4-6", "JUDGE_MODEL": "claude-inconnu"},
+            config.MODEL_PRICES,
+        )
+
+
+def test_validation_passe_quand_tous_les_roles_ont_un_tarif():
+    """Aucune erreur si la table couvre tous les rôles."""
+
+    config._validate_prices({"AGENT_MODEL": "claude-sonnet-5-5"}, config.MODEL_PRICES)
