@@ -1,7 +1,7 @@
 """Métriques de routing : fonctions pures, sans I/O ni appel API."""
 
-from collections import defaultdict
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import get_args
 
 from evals.routing.load import Forme, Route
@@ -44,13 +44,35 @@ def precision(pairs: Sequence[Pair], cls: Route) -> float | None:
     return expected.count(cls) / len(expected) if expected else None
 
 
-def accuracy_by_forme(items: Sequence[tuple[Forme, str, str]]) -> dict[Forme, float | None]:
-    """Accuracy par forme depuis des triplets (forme, attendu, prédit) ; None si forme absente."""
+@dataclass(frozen=True)
+class FormeStats:
+    """Effectif et bonnes réponses d'une forme."""
 
-    grouped: dict[Forme, list[Pair]] = defaultdict(list)
+    n: int
+    correct: int
+
+    @property
+    def accuracy(self) -> float | None:
+        """Part de bonnes réponses ; None si la forme est absente."""
+
+        return self.correct / self.n if self.n else None
+
+
+def accuracy_by_forme(
+    items: Sequence[tuple[Forme, str, str]], expected_total: int
+) -> dict[Forme, FormeStats]:
+    """Effectifs et accuracy par forme depuis des triplets (forme, attendu, prédit)."""
+
+    n: dict[Forme, int] = dict.fromkeys(FORMES, 0)
+    correct: dict[Forme, int] = dict.fromkeys(FORMES, 0)
     for forme, expected, predicted in items:
-        grouped[forme].append((expected, predicted))
-    return {f: accuracy(grouped[f]) if grouped[f] else None for f in FORMES}
+        if forme in n:
+            n[forme] += 1
+            correct[forme] += expected == predicted
+    # Guard - une forme hors FORMES ou une question perdue fausserait le tableau sans alerte
+    if sum(n.values()) != expected_total:
+        raise ValueError(f"Somme des n par forme ({sum(n.values())}) != total ({expected_total})")
+    return {f: FormeStats(n[f], correct[f]) for f in FORMES}
 
 
 def unstable_ids(predictions: dict[str, Sequence[str]]) -> list[str]:

@@ -114,10 +114,15 @@ def render_report(
         row = matrix[expected]
         lines.append(f"| {expected} | {row['sql']} | {row['rag']} | {row['hybride']} |")
 
-    lines += ["", "## Accuracy par forme (runs cumulés)", "", "| Forme | Accuracy |", "|---|---|"]
+    lines += ["", "## Accuracy par forme (runs cumulés)", ""]
+    lines += ["| Forme | n | Correctes | Accuracy |", "|---|---|---|---|"]
     triples = [(c.forme, c.route_attendue, p.predicted) for run in runs for c, p in zip(cases, run)]
-    for forme, acc in metrics.accuracy_by_forme(triples).items():
-        lines.append(f"| {forme} | {metrics.fmt_ratio(acc)} |")
+    stats = metrics.accuracy_by_forme(triples, len(cases) * len(runs))
+    for forme, st in stats.items():
+        lines.append(f"| {forme} | {st.n} | {st.correct} | {metrics.fmt_ratio(st.accuracy)} |")
+    total = sum(st.n for st in stats.values())
+    ok = sum(st.correct for st in stats.values())
+    lines.append(f"| **Total** | {total} | {ok} | {metrics.fmt_ratio(ok / total)} |")
 
     by_id = {c.id: [run[i].predicted for run in runs] for i, c in enumerate(cases)}
     unstable = metrics.unstable_ids(by_id)

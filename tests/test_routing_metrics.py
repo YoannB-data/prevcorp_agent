@@ -1,5 +1,7 @@
 """Tests des métriques de routing (fixture de 6 cas calculée à la main)."""
 
+import pytest
+
 from evals.routing.metrics import (
     accuracy,
     accuracy_by_forme,
@@ -63,10 +65,19 @@ def test_accuracy_par_forme():
         ("simple", "sql", "rag"),
         ("piege", "rag", "rag"),
     ]
-    result = accuracy_by_forme(items)
-    assert result["simple"] == 0.5
-    assert result["piege"] == 1.0
-    assert result["implicite"] is None
+    result = accuracy_by_forme(items, 3)
+    assert (result["simple"].n, result["simple"].correct) == (2, 1)
+    assert result["simple"].accuracy == 0.5
+    assert (result["piege"].n, result["piege"].correct) == (1, 1)
+    assert result["implicite"].n == 0
+    assert result["implicite"].accuracy is None
+    assert sum(s.n for s in result.values()) == 3
+
+
+def test_somme_incoherente_leve():
+    items = [("simple", "sql", "sql")]
+    with pytest.raises(ValueError, match="Somme des n"):
+        accuracy_by_forme(items, 2)
 
 
 def test_instables():
