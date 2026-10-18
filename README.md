@@ -60,7 +60,7 @@ uv run pre-commit install
 
 ## Configuration
 
-Créer un fichier `.env` à la racine :
+Créer un fichier `.env` à la racine (`cp .env.example .env` : les chemins y pointent déjà vers les données de démo versionnées dans `data/demo/`) :
 
 ```env
 ANTHROPIC_API_KEY=sk-ant-...
@@ -70,7 +70,7 @@ SEMANTIC_MANIFEST_PATH=/chemin/vers/semantic_manifest.json
 DUCKDB_PATH=/chemin/vers/base.duckdb
 ```
 
-Optionnel : `EDGE_BINARY` (chemin complet de l'exécutable Edge), utile uniquement sur une machine sans GTK3 pour le rendu HTML → PDF du corpus.
+Optionnel : `AGENT_THINKING_MODE` (mode de raisonnement de l'agent, clé de `MODEL_PARAMS` dans `src/config.py`, défaut `default`) et `EDGE_BINARY` (chemin complet de l'exécutable Edge), utile uniquement sur une machine sans GTK3 pour le rendu HTML → PDF du corpus.
 
 Lancer toutes les commandes depuis la racine du projet (les chemins des logs sont relatifs au répertoire courant).
 
@@ -96,7 +96,7 @@ Pour appeler directement le pipeline SQL : `from src.structured.sql_agent import
 
 ### Index RAG
 
-L'index Qdrant (`qdrant_storage/`) n'est pas reconstruit automatiquement quand `data/corpus/pdf/` change :
+L'index Qdrant (`data/demo/qdrant_storage/`) n'est pas reconstruit automatiquement quand `data/corpus/pdf/` change :
 
 ```bash
 uv run python -m src.rag.ingestion [--collection NOM] [--recreate]
@@ -123,6 +123,14 @@ Chaque question de `evals/rag/eval_set.yml` est évaluée en retrieval (R), de b
 
 Historique des jeux de questions RAG et de leurs hashes : [evals/rag/CHANGELOG.md](evals/rag/CHANGELOG.md).
 
+### Routeur
+
+```bash
+uv run python evals/routing/run_routing.py [--runs 3]
+```
+
+Mesure l'étiquette de route (`sql` / `rag`) sur `evals/routing/eval_set.yml` (70 questions sql, rag et hybrides), moyennée sur plusieurs runs. Rapports dans `evals/routing/reports/`.
+
 ## Harnais de développement (Claude Code)
 
 Le repo embarque l'outillage agentique utilisé pour le construire :
@@ -143,7 +151,8 @@ src/
   app.py               # Interface Streamlit
   router.py            # Classification sql / rag via Claude
   orchestrator.py      # Route puis délègue au pipeline SQL ou RAG
-  config.py            # Paramètres (clés, chemins, modèle, coûts)
+  config.py            # Paramètres (clés, chemins, modèles par rôle, coûts)
+  llm.py               # Lecture des réponses de l'API (texte, tokens de raisonnement)
   logger.py            # Log JSONL des interactions (tokens, latence, coût)
   structured/          # Pipeline SQL
     sql_agent.py         # Orchestration Claude API, retry, logging
@@ -167,17 +176,18 @@ evals/
     run_evals.py         # Runner d'évaluation SQL
     reports/             # Rapports Markdown (baselines/ versionné)
   rag/                 # Éval du pipeline RAG
-    eval_set.yml         # 25 questions d'éval RAG
+    eval_set.yml         # 23 questions d'éval RAG (v4)
     run_evals.py         # Runner d'évaluation RAG
     run_faithfulness.py  # Faithfulness (variante header)
     CHANGELOG.md         # Versions et hashes des jeux de questions
     reports/             # Rapports Markdown (baselines/ versionné)
+  routing/             # Éval du routeur (eval_set.yml, run_routing.py)
   reports/latest.json  # Dernier score SQL, lu par la sidebar Streamlit
+data/demo/             # Données de démo versionnées : DuckDB, manifests dbt, stockage Qdrant
 data/corpus/
   src/                 # Sources HTML du corpus, versionnées
   pdf/                 # PDF du corpus (gitignorés, dérivés de src/)
-qdrant_storage/        # Collection Qdrant locale
-scripts/               # dump_chunks.py (lecture des chunks Qdrant)
+scripts/               # dump_chunks.py (lecture des chunks Qdrant), diag_croisement.py (diagnostic retrieval)
 logs/
   interactions.jsonl   # Historique de toutes les interactions
 ```
@@ -193,7 +203,7 @@ Base en étoile :
 
 ## Stack technique
 
-- [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python) — client Claude API (modèle défini dans `src/config.py`)
+- [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python) — client Claude API (modèles définis dans `src/config.py`)
 - [Voyage AI](https://www.voyageai.com/) — embeddings pour le RAG
 - [Qdrant](https://qdrant.tech/) — base vectorielle (mode local embarqué)
 - [Streamlit](https://streamlit.io/) — interface utilisateur
