@@ -1,88 +1,109 @@
 # PrevCorp Agent
 
-Agent conversationnel Claude pour l'analyse de données de **prévoyance collective**. L'utilisateur pose une question en langage naturel via une interface Streamlit ; un routeur la classe comme question **structurée** (`sql`) ou **documentaire** (`rag`), puis l'oriente vers le pipeline correspondant :
+Assistant IA qui répond en français aux questions d'un assureur prévoyance, en choisissant lui-même sa source :
+**SQL** sur l'entrepôt de données (dbt + DuckDB) ou **recherche documentaire** (RAG) sur les conditions générales et notices.
+Chaque réponse est traçable (SQL affiché, documents cités), et chaque composant est mesuré par des évaluations maison versionnées.
 
-- **SQL** : l'agent traduit la question en SQL, l'exécute contre une base DuckDB et retourne un tableau avec une visualisation Plotly automatique.
-- **RAG** : la question est vectorisée (Voyage), les passages les plus proches sont retrouvés dans Qdrant, et Claude répond en citant ses sources.
+**[▶ Démo en ligne](https://prevcorp-agent.streamlit.app/)** : si l'app dort, cliquez pour la réveiller (environ 30 secondes).
 
-## Fonctionnement
+![Démo PrevCorp](docs/demo.gif)
+
+> Données et documents **100 % synthétiques**. La structure s'inspire de documents publics du secteur
+> (notices d'information, tableaux de garanties, conventions collectives) ; le contenu est intégralement généré.
+> Aucune donnée réelle d'assureur n'est utilisée.
+
+## En bref
+
+- **Agent SQL** : question en français → SQL généré par Claude à partir du schéma dbt et du semantic layer → exécution DuckDB en lecture seule → tableau + graphique. Auto-correction en cas d'erreur SQL (3 tentatives max).
+- **RAG** : embeddings Voyage, index Qdrant, réponse citée. Évaluation qui **sépare l'échec de recherche de l'échec de génération**.
+- **Routeur** : un appel Claude classe la question (`sql` ou `rag`), puis l'orchestrateur délègue au bon pipeline.
+- **Évaluations** : 67 questions SQL, 23 questions RAG, 70 questions de routing, rapports versionnés dans `evals/*/reports/baselines/`.
+- **Harnais Claude Code** : `CLAUDE.md`, skill, hook de qualité. Le repo contient aussi l'outillage agentique qui a servi à le construire.
+
+## Évaluation
+
+| Composant | Eval set | Score | Méthode |
+|---|---|---|---|
+| Agent SQL | 67 questions évaluées (+16 hors périmètre) | **89,6 %** | Moyenne de 3 runs (61, 60, 59 PASS), Sonnet 4.6 |
+| RAG, retrieval | 21 questions | 16/21 | Les documents attendus sont-ils dans le top 5 ? Déterministe |
+| RAG, bout en bout | 23 questions | 18,3/23 | Réponse jugée par LLM, moyenne de 3 runs |
+| RAG, génération isolée | 23 questions | 21,7/23 | Même juge, avec les bons documents fournis, moyenne de 3 runs |
+| Routing SQL / RAG | 70 questions | 71,4 % | 100 % sur les 50 mono-source, 0 % sur les 20 hybrides |
+
+L'écart entre « génération isolée » et « bout en bout » mesure ce que coûte le retrieval : le modèle sait répondre
+quand on lui fournit les bons documents, il échoue surtout quand il ne les trouve pas.
+Le point faible identifié est le **croisement de deux documents** (retrieval 4/8).
+
+### Limites assumées
+
+- **SQL** : une partie des questions est validée sur le nombre de lignes. Ce critère peut accepter une réponse
+  fausse qui renvoie le bon nombre de lignes : le score est probablement légèrement surévalué.
+- **RAG** : un seul juge LLM (Sonnet 4.6), avec un bruit observé de ±3/23 d'un run à l'autre.
+- **Questions hybrides** : le routeur est binaire (SQL ou RAG). Les questions qui demandent à la fois des données
+  et des documents ne sont pas traitées, d'où le 0/20, par construction.
+- **Choix du modèle** : Sonnet 5.5 a été testé sur l'eval SQL et a fait moins bien (85,3 % sur 6 runs).
+  Le projet reste sur Sonnet 4.6.
+- **Coût** : la génération SQL injecte le schéma complet (environ 6 300 tokens par appel), contre environ 170 pour
+  le routage. C'est le premier poste d'optimisation. La démo publique tourne sur une clé dédiée, plafonnée.
+- **Observabilité** : seul le pipeline SQL est journalisé (JSONL). Le pipeline RAG ne l'est pas encore.
+
+## Architecture
 
 ```
-Question utilisateur (Streamlit)
+Question (Streamlit)
        ↓
 Routeur (appel Claude) → sql | rag
        ↓
-Orchestrateur → pipeline SQL ou pipeline RAG
+Orchestrateur
+   ├─ Pipeline SQL
+   │    Few-shot (mots-clés) + schéma dbt + semantic layer
+   │    → Claude génère le SQL → DuckDB (lecture seule)
+   │    └─ erreur SQL → retry avec le message d'erreur (3 tentatives max)
+   │    → DataFrame + graphique Plotly
+   │    → log JSONL (tokens, latence, coût)
+   │
+   └─ Pipeline RAG
+        Embedding de la question (Voyage)
+        → top-k chunks (Qdrant local, filtre optionnel par type de document)
+        → Claude répond en citant ses sources
 ```
 
-Pipeline SQL :
+## Harnais de développement (Claude Code)
 
-```
-Few-shot selection (mots-clés)
-       ↓
-Injection schéma dbt + semantic layer
-       ↓
-Appel Claude API → génération SQL
-       ↓
-Exécution DuckDB (lecture seule)
-  └─ Erreur SQL → retry avec feedback (max 3 tentatives)
-       ↓
-Résultat (DataFrame) + graphique Plotly
-       ↓
-Log JSONL (tokens, latence, coût) — seul le pipeline SQL est journalisé
-```
+Le repo embarque l'outillage agentique utilisé pour le construire :
 
-Pipeline RAG :
+- `CLAUDE.md` : commandes, conventions et pièges connus, chargés à chaque session.
+- `.claude/skills/corpus-generator/` : génère un document du corpus RAG depuis une spec.
+- `.claude/settings.json` : hook `PostToolUse` qui lance ruff (tous les `.py`) et mypy (`src/` uniquement) sur
+  chaque fichier écrit ou édité par l'agent. En cas d'erreur, le hook sort en exit 2 et l'agent reçoit le
+  diagnostic pour se corriger.
 
-```
-Embedding de la question (Voyage)
-       ↓
-Top-k chunks (Qdrant local, filtre optionnel par doc_type)
-       ↓
-Appel Claude → réponse avec citations des sources
-```
+Limite connue : mypy ne vérifie que le fichier édité, pas ses appelants. Le hook sert de feedback rapide ;
+la vérification complète reste celle de la CI.
 
-## Prérequis
+## Lancer en local
 
-- Python 3.12
-- [UV](https://docs.astral.sh/uv/) comme gestionnaire de paquets
-- Clés API Anthropic et Voyage
-- Base DuckDB + manifests dbt compilés (`manifest.json` et `semantic_manifest.json`) : une version de démo est versionnée dans `data/demo/`
-
-## Installation
+Prérequis : Python 3.12, [uv](https://docs.astral.sh/uv/), clés API Anthropic et Voyage.
 
 ```bash
-git clone <repo>
+git clone https://github.com/YoannB-data/prevcorp_agent.git
 cd prevcorp_agent
 uv sync --all-groups
 uv run pre-commit install
-```
-
-## Configuration
-
-Créer un fichier `.env` à la racine (`cp .env.example .env` : les chemins y pointent déjà vers les données de démo versionnées dans `data/demo/`) :
-
-```env
-ANTHROPIC_API_KEY=sk-ant-...
-VOYAGE_API_KEY=...
-MANIFEST_PATH=/chemin/vers/manifest.json
-SEMANTIC_MANIFEST_PATH=/chemin/vers/semantic_manifest.json
-DUCKDB_PATH=/chemin/vers/base.duckdb
-```
-
-Optionnel : `AGENT_THINKING_MODE` (mode de raisonnement de l'agent, clé de `MODEL_PARAMS` dans `src/config.py`, défaut `default`) et `EDGE_BINARY` (chemin complet de l'exécutable Edge), utile uniquement sur une machine sans GTK3 pour le rendu HTML → PDF du corpus.
-
-Lancer toutes les commandes depuis la racine du projet (les chemins des logs sont relatifs au répertoire courant).
-
-## Utilisation
-
-### Interface Streamlit
-
-```bash
+cp .env.example .env    # puis renseigner ANTHROPIC_API_KEY et VOYAGE_API_KEY
 uv run streamlit run src/app.py
 ```
 
-La sidebar affiche le score du dernier run d'évaluation et le nombre de questions posées dans la session.
+Les données de démo (`data/demo/` : base DuckDB, manifests dbt, index Qdrant) sont versionnées et
+`.env.example` pointe déjà dessus : l'app fonctionne dès le clone, sans projet dbt.
+
+Lancer toutes les commandes depuis la racine du projet : les chemins sont relatifs au répertoire courant.
+
+Variables optionnelles :
+- `AGENT_THINKING_MODE` : mode de raisonnement de l'agent (clé de `MODEL_PARAMS` dans `src/config.py`, défaut
+  `default`). Une valeur inconnue pour le modèle configuré fait échouer l'app au démarrage.
+- `EDGE_BINARY` : chemin complet de l'exécutable Edge, utile uniquement sur une machine sans GTK3 pour le rendu
+  HTML → PDF du corpus.
 
 ### API Python
 
@@ -92,58 +113,52 @@ from src.orchestrator import orchestrator_main
 result = orchestrator_main("Combien de dossiers ouverts en 2024 ?")
 ```
 
-Pour appeler directement le pipeline SQL : `from src.structured.sql_agent import agent_main` puis `sql, df = agent_main(question)`.
+Pipeline SQL seul : `from src.structured.sql_agent import agent_main`, puis `sql, df = agent_main(question)`.
 
-### Index RAG
+## Relancer les évaluations
 
-L'index Qdrant (`data/demo/qdrant_storage/`) n'est pas reconstruit automatiquement quand `data/corpus/pdf/` change :
+```bash
+# SQL
+uv run python evals/sql/run_evals.py                 # suite complète
+uv run python evals/sql/run_evals.py --ids Q012 Q034 # questions spécifiques
+
+# RAG : retrieval (R), bout en bout (E), génération isolée (I)
+uv run python evals/rag/run_evals.py [--k 5] [--variant header] [--judge-model MODELE] [--ids RC01 ...]
+uv run python evals/rag/run_faithfulness.py [--k 5] [--judge-model MODELE] [--ids RC01 ...]
+
+# Routeur
+uv run python evals/routing/run_routing.py [--runs 3]
+```
+
+- Rapports horodatés dans `evals/{sql,rag,routing}/reports/`. Seuls les `baselines/` sont versionnés.
+- `evals/reports/latest.json` est lu par la sidebar Streamlit (écrit uniquement sur un run SQL complet).
+- `run_faithfulness.py` mesure, via un juge LLM, la part des affirmations de chaque réponse appuyées par les
+  chunks récupérés.
+- Les runners RAG refusent de tourner (code 2) si la collection Qdrant n'a pas été ingérée avec la variante
+  `header`. Ne pas les lancer pendant que Streamlit tourne (verrou disque Qdrant). Les appels Voyage et
+  Anthropic sont facturés.
+- Historique des jeux de questions RAG et de leurs hashes : [evals/rag/CHANGELOG.md](evals/rag/CHANGELOG.md).
+
+## Rafraîchir les données de la démo
+
+`data/demo/` est un snapshot figé au moment du déploiement. Les données viennent du projet dbt
+[prevcorp_dbt](https://github.com/YoannB-data/prevcorp_dbt) (génération du dataset synthétique et modélisation),
+à cloner à côté de ce repo. Après une modification du projet dbt :
+
+```powershell
+# Fermer Streamlit et toute connexion DuckDB avant la copie (sinon fichier verrouillé)
+# Prérequis : ~/.dbt/profiles.yml configuré (cf. README de prevcorp_dbt)
+cd ..\prevcorp_dbt\prevcorp_dbt
+uv run dbt build
+Copy-Item dev.duckdb, target\manifest.json, target\semantic_manifest.json ..\..\prevcorp_agent\data\demo\ -Force
+```
+
+Après une modification du corpus (`data/corpus/src/`), relancer l'ingestion. Elle écrit directement dans
+`data/demo/qdrant_storage/` :
 
 ```bash
 uv run python -m src.rag.ingestion [--collection NOM] [--recreate]
 ```
-
-## Évaluations
-
-### SQL
-
-```bash
-uv run python evals/sql/run_evals.py                 # suite complète
-uv run python evals/sql/run_evals.py --ids Q012 Q034 # questions spécifiques
-```
-
-Les résultats sont écrits dans `evals/sql/reports/` (Markdown horodaté) et `evals/reports/latest.json` (lu par la sidebar Streamlit, écrit uniquement sur un run complet).
-
-### RAG
-
-```bash
-uv run python evals/rag/run_evals.py [--k 5] [--variant header] [--judge-model MODELE] [--ids RC01 ...]
-uv run python evals/rag/run_faithfulness.py [--k 5] [--judge-model MODELE] [--ids RC01 ...]
-```
-
-Chaque question de `evals/rag/eval_set.yml` est évaluée en retrieval (R), de bout en bout (E) et en génération isolée (I). `run_faithfulness.py` mesure, via un juge LLM, la part des affirmations de chaque réponse appuyées par les chunks récupérés. Les deux runners refusent de tourner (code 2) si la collection Qdrant n'a pas été ingérée avec la variante `header`. Rapports dans `evals/rag/reports/`. Ne pas lancer pendant que Streamlit tourne (verrou disque Qdrant) ; les appels Voyage et Anthropic sont facturés.
-
-Historique des jeux de questions RAG et de leurs hashes : [evals/rag/CHANGELOG.md](evals/rag/CHANGELOG.md).
-
-### Routeur
-
-```bash
-uv run python evals/routing/run_routing.py [--runs 3]
-```
-
-Mesure l'étiquette de route (`sql` / `rag`) sur `evals/routing/eval_set.yml` (70 questions sql, rag et hybrides), moyennée sur plusieurs runs. Rapports dans `evals/routing/reports/`.
-
-## Harnais de développement (Claude Code)
-
-Le repo embarque l'outillage agentique utilisé pour le construire :
-
-- `CLAUDE.md` : commandes, conventions et pièges connus, chargés à chaque session
-- `.claude/skills/corpus-generator/` : génère un document du corpus RAG depuis une spec
-- `.claude/settings.json` : hook `PostToolUse` qui lance ruff (tous les `.py`) et mypy
-  (`src/` uniquement) sur chaque fichier écrit ou édité par l'agent. En cas d'erreur,
-  le hook sort en exit 2 et l'agent reçoit le diagnostic pour se corriger.
-
-Limite connue : mypy ne vérifie que le fichier édité, pas ses appelants. Le hook sert
-de feedback rapide ; la vérification complète reste celle de la CI.
 
 ## Structure
 
@@ -152,11 +167,11 @@ src/
   app.py               # Interface Streamlit
   router.py            # Classification sql / rag via Claude
   orchestrator.py      # Route puis délègue au pipeline SQL ou RAG
-  config.py            # Paramètres (clés, chemins, modèles par rôle, coûts)
+  config.py            # Paramètres (chemins, modèles par rôle, coûts), validés au démarrage
   llm.py               # Lecture des réponses de l'API (texte, tokens de raisonnement)
   logger.py            # Log JSONL des interactions (tokens, latence, coût)
   structured/          # Pipeline SQL
-    sql_agent.py         # Orchestration Claude API, retry, logging
+    sql_agent.py         # Appel Claude, retry, logging
     schema_loader.py     # manifest.json (schéma) + semantic_manifest.json (métriques)
     duckdb_executor.py   # Exécution SQL en lecture seule
     few_shot_selector.py # Sélection d'exemples par mots-clés
@@ -167,27 +182,19 @@ src/
     generator.py         # Chunks + question → réponse citée
     pdf_text.py          # Extraction du texte des PDF
     metadata.py          # Métadonnées des documents (doc_id, doc_type)
-    evaluation/          # Runner d'éval RAG (schéma du YAML, retrieval, scorers, juge, faithfulness, diagnose, rapport)
+    evaluation/          # Runner d'éval RAG (schéma du YAML, retrieval, scorers, juge, faithfulness, diagnostic, rapport)
   prompts/
-    system_prompt.md   # Prompt système injecté dans chaque appel
-    few_shot_bank.yml  # Banque d'exemples few-shot
+    system_prompt.md     # Prompt système injecté dans chaque appel
+    few_shot_bank.yml    # Banque d'exemples few-shot
 evals/
-  sql/                 # Éval du pipeline SQL
-    eval_set.yml         # Questions avec SQL de référence et mode de comparaison
-    run_evals.py         # Runner d'évaluation SQL
-    reports/             # Rapports Markdown (baselines/ versionné)
-  rag/                 # Éval du pipeline RAG
-    eval_set.yml         # 23 questions d'éval RAG (v4)
-    run_evals.py         # Runner d'évaluation RAG
-    run_faithfulness.py  # Faithfulness (variante header)
-    CHANGELOG.md         # Versions et hashes des jeux de questions
-    reports/             # Rapports Markdown (baselines/ versionné)
-  routing/             # Éval du routeur (eval_set.yml, run_routing.py)
-  reports/latest.json  # Dernier score SQL, lu par la sidebar Streamlit
-data/demo/             # Données de démo versionnées : DuckDB, manifests dbt, stockage Qdrant
-data/corpus/
-  src/                 # Sources HTML du corpus, versionnées
-  pdf/                 # PDF du corpus (gitignorés, dérivés de src/)
+  sql/                 # eval_set.yml (SQL de référence + mode de comparaison), run_evals.py, reports/
+  rag/                 # eval_set.yml (23 questions, v4), run_evals.py, run_faithfulness.py, CHANGELOG.md, reports/
+  routing/             # eval_set.yml (70 questions), run_routing.py, reports/
+  reports/latest.json  # Score SQL lu par la sidebar Streamlit
+data/
+  demo/                # Snapshot de démo versionné : DuckDB, manifests dbt, stockage Qdrant
+  corpus/src/          # Sources HTML du corpus, versionnées
+  corpus/pdf/          # PDF du corpus (gitignorés, dérivés de src/)
 scripts/               # dump_chunks.py (lecture des chunks Qdrant), diag_croisement.py (diagnostic retrieval)
 logs/
   interactions.jsonl   # Historique des appels du pipeline SQL (succès et erreurs)
@@ -195,25 +202,18 @@ logs/
 
 ## Schéma de données
 
-Base en étoile :
+Modèle en étoile produit par le projet dbt [prevcorp_dbt](https://github.com/YoannB-data/prevcorp_dbt) :
 
 | Type | Tables |
 |------|--------|
-| Dimensions | `dim__assures`, `dim__contrats`, `dim__entreprises`, `dim__beneficiaires` |
+| Dimensions | `dim__segments`, `dim__entreprises`, `dim__contrats`, `dim__assures`, `dim__beneficiaires` |
 | Faits | `fct__dossiers`, `fct__paiements`, `fct__cotisations`, `fct__ressources`, `fct__contrats_entreprises` |
 
-## Stack technique
+## Stack
 
-- [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python) — client Claude API (modèles définis dans `src/config.py`)
-- [Voyage AI](https://www.voyageai.com/) — embeddings pour le RAG
-- [Qdrant](https://qdrant.tech/) — base vectorielle (mode local embarqué)
-- [Streamlit](https://streamlit.io/) — interface utilisateur
-- [DuckDB](https://duckdb.org/) — moteur SQL embarqué
-- [Plotly](https://plotly.com/python/) — visualisations automatiques
-- [pandas](https://pandas.pydata.org/) — manipulation des résultats
-- [pdfplumber](https://github.com/jsvine/pdfplumber) — extraction du texte des PDF du corpus
-- [Pydantic](https://docs.pydantic.dev/) — résultat unifié de l'orchestrateur
-- [WeasyPrint](https://weasyprint.org/) — rendu HTML → PDF du corpus (repli sur Edge headless sans GTK3)
-- [Ruff](https://github.com/astral-sh/ruff) — formatter + linter (remplace black, isort, flake8)
-- [mypy](https://mypy-lang.org/) — type checking statique
-- [pre-commit](https://pre-commit.com/) — hooks git locaux
+- **LLM et IA** : Claude API via Anthropic SDK (Sonnet 4.6, modèles par rôle dans `src/config.py`), Voyage AI
+  (`voyage-multilingual-2`), Qdrant (mode local embarqué)
+- **Données** : dbt + DuckDB + MetricFlow, pandas
+- **Interface** : Streamlit + Plotly
+- **Corpus** : WeasyPrint (HTML → PDF, repli sur Edge headless sans GTK3), pdfplumber (extraction)
+- **Qualité** : Pydantic, Ruff, mypy, pre-commit, GitHub Actions
