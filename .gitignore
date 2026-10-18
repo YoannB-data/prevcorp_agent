@@ -4,7 +4,8 @@
 .ruff_cache/
 .venv/
 data/corpus/pdf/
-qdrant_storage/
+/qdrant_storage/
+data/demo/qdrant_storage/.lock
 __pycache__/
 evals/reports/*
 !evals/reports/latest.json

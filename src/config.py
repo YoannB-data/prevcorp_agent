@@ -29,6 +29,7 @@ AGENT_THINKING_MODE = os.getenv("AGENT_THINKING_MODE", "default")
 SEMANTIC_MANIFEST_PATH = Path(_require_env("SEMANTIC_MANIFEST_PATH"))
 MANIFEST_PATH = Path(_require_env("MANIFEST_PATH"))
 DUCKDB_PATH = Path(_require_env("DUCKDB_PATH"))
+QDRANT_PATH = Path(__file__).parent.parent / "data" / "demo" / "qdrant_storage"
 
 LOGS_JSONL_PATH = Path("logs/interactions.jsonl")
 

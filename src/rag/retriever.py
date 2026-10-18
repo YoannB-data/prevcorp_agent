@@ -3,16 +3,16 @@ Composant de recherche RAG — question → chunks pertinents depuis Qdrant
 """
 
 import os
-from pathlib import Path
 
 import voyageai
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchValue
 
+from src.config import QDRANT_PATH
+
 load_dotenv()
 
-QDRANT_PATH = Path(__file__).parent.parent.parent / "qdrant_storage"
 COLLECTION_NAME = "prevcorp_docs"
 EMBEDDING_MODEL = "voyage-multilingual-2"
 TOP_K = 5
