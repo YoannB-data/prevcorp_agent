@@ -1,0 +1,550 @@
+# Eval set ROUTING PrevCorp — v1, 70 questions (sql 25, rag 25, hybride 20)
+# sql : 18 simple + 7 piege ; rag : 20 simple + 5 piege ; hybride : 12 explicite + 4 implicite + 4 dependante
+# Mesure l'ÉTIQUETTE de route, pas la calculabilité de la réponse : une hybride dont le SQL renvoie 0 reste valide.
+# Revue de faisabilité des hybrides RT-H01 à RT-H10 : evals/review_hybrides_v0.md (RT-H08 rejetée, absente).
+# Questions dépendantes (forme: dependante) : étiquetées, hors périmètre d'exécution v1.
+#
+# Conventions :
+#   - id : RT-S (sql tirées de evals/sql/eval_set.yml), RT-R (rag tirées de evals/rag/eval_set.yml),
+#     RT-H (hybrides), RT-P (pièges)
+#   - origine : id source (texte copié à l'identique), review_hybrides_v0, ou nouvelle
+#   - reponse_attendue : optionnelle, remplie plus tard pour l'éval end-to-end
+
+meta:
+  version: "1.0"
+  date: "2026-10-16"
+  total: 70
+  comptes:
+    sql: {simple: 18, piege: 7}
+    rag: {simple: 20, piege: 5}
+    hybride: {explicite: 12, implicite: 4, dependante: 4}
+  classes: [sql, rag, hybride]
+  critere: "match strict de route_attendue"
+  formes:
+    - simple      # question reprise d'un eval set mono-pipeline
+    - explicite   # hybride, deux demandes reliées par « et »
+    - implicite   # hybride sans « et » : le besoin des deux sources se déduit
+    - dependante  # hybride dont une partie a besoin de la sortie de l'autre (exécution séquentielle)
+    - piege       # vocabulaire de l'autre pipeline que celui attendu
+  metriques:
+    - accuracy
+    - matrice_de_confusion
+    - rappel_hybride        # métrique de décision
+    - latence
+    - cout
+    - determinisme          # 3 runs, même étiquette attendue
+    - marge_similarite_top1_top2   # routeur sémantique uniquement
+  seuils:
+    accuracy: 0.90
+    rappel_hybride: 0.80
+
+questions:
+
+  # ---------------------------------------------------------------------------
+  # SQL — 20 questions de evals/sql/eval_set.yml, hors compare: skip, 7 catégories
+  # 18 simple + 2 piege (RT-S16, RT-S17 reclassées : vocabulaire documentaire)
+  # ---------------------------------------------------------------------------
+
+  - id: RT-S01
+    question: "Combien avons-nous d'assurés non fiscalisés en France, à date ?"
+    route_attendue: sql
+    forme: simple
+    origine: Q012
+    note: "Agrégation sur dim__assures (pays_code, attestation_fiscale_etranger)."
+
+  - id: RT-S02
+    question: "Combien de dossiers ont été indemnisés au moins 1 fois en 2025 ?"
+    route_attendue: sql
+    forme: simple
+    origine: Q034
+    note: "Comptage de dossiers ayant un paiement en 2025."
+
+  - id: RT-S03
+    question: "Quel est le montant total des cotisations perçues en 2024 ?"
+    route_attendue: sql
+    forme: simple
+    origine: Q069
+    note: "Somme sur fct__cotisations ; « cotisations » ne renvoie à aucun taux documentaire."
+
+  - id: RT-S04
+    question: "Peux-tu me faire une extraction des invalidités en cours pour Martinez SA : cadres = C42495 et non-cadres = C63218 ?"
+    route_attendue: sql
+    forme: simple
+    origine: Q003
+    note: "Liste de dossiers filtrée par contrats ; le « et » relie deux filtres, pas deux sources."
+
+  - id: RT-S05
+    question: "Dans notre segment Boucherie artisanale, il y a des contrats ouverts avec des entreprises fermées. Peux-tu nous sortir une extraction ?"
+    route_attendue: sql
+    forme: simple
+    origine: Q025
+    note: "Liste croisant statut contrat et statut entreprise."
+
+  - id: RT-S06
+    question: "Liste des dossiers d'invalidité qui n'ont qu'une rente SS en ressource."
+    route_attendue: sql
+    forme: simple
+    origine: Q063
+    note: "Liste sur fct__ressources (ressource_type = Rente SS)."
+
+  - id: RT-S07
+    question: "Récapitulatif des sommes versées depuis 2023 (date d'adhésion) pour l'ensemble des salariés en arrêt. Contrat C74382."
+    route_attendue: sql
+    forme: simple
+    origine: Q006
+    note: "Paiements filtrés par contrat et période ; C74382 n'a pas de Résumé."
+
+  - id: RT-S08
+    question: "Transmettre les règlements de novembre et décembre 2024."
+    route_attendue: sql
+    forme: simple
+    origine: Q033
+    note: "Extraction de paiements par période ; « règlements » = paiements, pas le Règlement."
+
+  - id: RT-S09
+    question: "Liste des contrats pour lesquels nous n'avons rien perçu en 2025."
+    route_attendue: sql
+    forme: simple
+    origine: Q057
+    note: "Anti-jointure contrats / cotisations 2025."
+
+  - id: RT-S10
+    question: "Dossiers DC en cours sur les contrats du segment Métallurgie."
+    route_attendue: sql
+    forme: simple
+    origine: Q005
+    note: "Filtre risque Décès + segment ; la Notice Métallurgie n'est pas sollicitée."
+
+  - id: RT-S11
+    question: "Extraction pour les dossiers du SIRET 93917251355215 avec un règlement depuis le 01/09/2024."
+    route_attendue: sql
+    forme: simple
+    origine: Q040
+    note: "Filtre entité (SIRET) + date de paiement."
+
+  - id: RT-S12
+    question: "Peux-tu me sortir l'état des cotisations de l'entreprise Laurent et Fils ?"
+    route_attendue: sql
+    forme: simple
+    origine: Q065
+    note: "Cotisations encaissées d'une entreprise."
+
+  - id: RT-S13
+    question: "Peux-tu me sortir le top 10 des salaires ?"
+    route_attendue: sql
+    forme: simple
+    origine: Q018
+    note: "Top N sur salaire_montant."
+
+  - id: RT-S14
+    question: "Quels sont les 5 segments avec le plus de dossiers ouverts en 2024 ?"
+    route_attendue: sql
+    forme: simple
+    origine: Q072
+    note: "Top N par segment."
+
+  - id: RT-S15
+    question: "Top 3 des risques les plus fréquents dans le portefeuille ?"
+    route_attendue: sql
+    forme: simple
+    origine: Q073
+    note: "Top N sur risque."
+
+  - id: RT-S16
+    question: "Extraction de tous les dossiers d'invalidité en cours où il n'y a pas d'information remplie dans les champs attestation de non-activité et justificatif SS."
+    route_attendue: sql
+    forme: piege
+    origine: Q001
+    note: "Colonnes NULL en base ; contraste voulu avec RT-H09 qui demande aussi la liste des pièces. Reclassée piège : vocabulaire documentaire dans une question SQL."
+
+  - id: RT-S17
+    question: "Extraction des non cadres qui ont reçu des prestations au titre de la garantie incapacité en 2025."
+    route_attendue: sql
+    forme: piege
+    origine: Q002
+    note: "« garantie incapacité » = risque Incapacité en base ; vocabulaire documentaire dans une question SQL de la source. Reclassée piège : vocabulaire documentaire dans une question SQL."
+
+  - id: RT-S18
+    question: "Quelle est la part des paiements avec un montant PAS (Prélèvement À la Source) supérieur à 10€ en nombre et en pourcentage ?"
+    route_attendue: sql
+    forme: simple
+    origine: Q035
+    note: "Ratio sur fct__paiements.pas_montant."
+
+  - id: RT-S19
+    question: "Quel est le montant fiscal 2025 à déclarer pour le dossier DOS497225 ?"
+    route_attendue: sql
+    forme: simple
+    origine: Q051
+    note: "Montant d'un dossier individuel ; « fiscal » ne renvoie à aucun document du corpus."
+
+  - id: RT-S20
+    question: "Quel est le nombre de paiements effectués par année pour le dossier DOS541134 ?"
+    route_attendue: sql
+    forme: simple
+    origine: Q078
+    note: "Comptage par année sur un dossier."
+
+  # ---------------------------------------------------------------------------
+  # RAG — 20 questions de evals/rag/eval_set.yml (v4)
+  # fait_simple 7, chiffre_precis 4, croisement 7, sans_reponse 2 ; exclues : RC13, RC16, RC19
+  # ---------------------------------------------------------------------------
+
+  - id: RT-R01
+    question: "Le contrat C87656 prévoit-il un délai de carence avant la prise d'effet de la garantie ITT, et si oui lequel ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC02
+    note: "fait_simple — Résumé C87656 ; le délai de carence n'existe pas en base."
+
+  - id: RT-R02
+    question: "Le concubin est-il inclus dans la désignation de bénéficiaire type du contrat C87656 ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC03
+    note: "croisement — Règlement + Notice Santé."
+
+  - id: RT-R03
+    question: "Le contrat C39949 couvre-t-il un rapatriement à l'étranger en cas de sinistre ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC04
+    note: "sans_reponse — question de garantie, aucune donnée en base."
+
+  - id: RT-R04
+    question: "Y a-t-il un écart entre le Résumé des garanties du contrat C39949 et la Notice CCN Agriculture sur la garantie ITT ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC05
+    note: "croisement — Résumé C39949 + Notice Agriculture."
+
+  - id: RT-R05
+    question: "Quel est le taux de couverture de l'invalidité sur le contrat C39949, pour les 3 catégories ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC06
+    note: "fait_simple — taux contractuels ; pas de catégorie d'invalidité en base."
+
+  - id: RT-R06
+    question: "Quel est le taux de couverture de l'incapacité sur le contrat C87656, et la franchise associée ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC07
+    note: "fait_simple — Résumé C87656."
+
+  - id: RT-R07
+    question: "Quelles sont les garanties décès prévues par le contrat C83792 ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC08
+    note: "chiffre_precis — Résumé C83792."
+
+  - id: RT-R08
+    question: "Quels sont les taux de la rente éducation du contrat C83792 ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC09
+    note: "chiffre_precis — Résumé C83792."
+
+  - id: RT-R09
+    question: "Quelles garanties optionnelles sont souscrites sur le contrat C87656 ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC10
+    note: "fait_simple — options souscrites absentes de la base."
+
+  - id: RT-R10
+    question: "Quelle modalité de franchise (continue ou discontinue) s'applique à la garantie Incapacité Temporaire de Travail du contrat C73736, et la CCN y déroge-t-elle ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC11
+    note: "croisement — Résumé C73736 + Notice Métallurgie."
+
+  - id: RT-R11
+    question: "Quel est le taux de la rente invalidité 2e catégorie sur la tranche B pour le contrat C73736 ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC12
+    note: "chiffre_precis — taux contractuel, pas un montant versé."
+
+  - id: RT-R12
+    question: "Quel document justificatif faut-il fournir en cas de décès pour prouver la qualité de concubin ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC14
+    note: "fait_simple — Règlement, Annexe I."
+
+  - id: RT-R13
+    question: "Quelle est la durée de la franchise avant le versement des indemnités journalières en cas d'arrêt maladie ordinaire ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC15
+    note: "fait_simple — FAQ ; durée contractuelle, pas une durée observée en base."
+
+  - id: RT-R14
+    question: "Quel est le taux de cotisation salarié pour la garantie rente de conjoint sur le contrat C73736 ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC17
+    note: "sans_reponse — un taux de cotisation est documentaire (la base n'a que des montants)."
+
+  - id: RT-R15
+    question: "Quel est le montant du capital décès toutes causes pour un salarié célibataire sans personne à charge sur le contrat C20077 ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC18
+    note: "chiffre_precis — capital contractuel (% du salaire), pas un montant versé."
+
+  - id: RT-R16
+    question: "Quel est le taux de couverture invalidité 2e catégorie du contrat C20077, et diffère-t-il du taux de base du Règlement ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC20
+    note: "croisement — Résumé C20077 + Règlement."
+
+  - id: RT-R17
+    question: "Quel est le délai de prescription pour une action en incapacité de travail sur le contrat C20077 ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC22
+    note: "croisement — Notice Transport art. 10 ; contraste avec RT-H03 qui ajoute un comptage."
+
+  - id: RT-R18
+    question: "Selon la FAQ, que doit faire un salarié du contrat C20077 en arrêt de travail pour percevoir ses indemnités journalières, et à quel taux sont-elles versées ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC23
+    note: "croisement — FAQ + Résumé C20077 ; le « et » relie deux documents, pas deux pipelines."
+
+  - id: RT-R19
+    question: "Sur le contrat C87656, quel capital perçoit le concubin d'un assuré célibataire sans enfant à charge ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC24
+    note: "croisement — capital contractuel, pas un montant versé."
+
+  - id: RT-R20
+    question: "Sur le contrat C20077, où le concubin n'est pas reconnu bénéficiaire, à qui est versé le capital décès si aucune désignation n'a été faite ?"
+    route_attendue: rag
+    forme: simple
+    origine: RC25
+    note: "fait_simple — Notice Transport, clause type."
+
+  # ---------------------------------------------------------------------------
+  # HYBRIDES — 9 issues de review_hybrides_v0 (RT-H08 rejetée), 11 nouvelles
+  # ---------------------------------------------------------------------------
+
+  - id: RT-H01
+    question: "Combien de dossiers d'arrêt de travail ont été ouverts sur le contrat C39949 depuis 2022, et quelle franchise ITT prévoit son Résumé des garanties ?"
+    route_attendue: hybride
+    forme: explicite
+    origine: review_hybrides_v0
+    note: "Comptage fct__dossiers + franchise du Résumé C39949 (distracteur Notice Agriculture)."
+
+  - id: RT-H02
+    question: "Combien d'arrêts de travail en cours sur C39949 ont déjà dépassé la franchise prévue au contrat ?"
+    route_attendue: hybride
+    forme: dependante
+    origine: review_hybrides_v0
+    note: "Le seuil du filtre SQL vient du Résumé (RAG → SQL)."
+
+  - id: RT-H03
+    question: "Sur le Transport routier, combien de dossiers incapacité encore en cours ont un fait générateur de plus de 2 ans au 31/12/2025, et quel délai de prescription s'applique à la garantie incapacité dans cette convention ?"
+    route_attendue: hybride
+    forme: explicite
+    origine: review_hybrides_v0
+    note: "Comptage fct__dossiers + prescription de la Notice Transport art. 10."
+
+  - id: RT-H04
+    question: "Quel montant de cotisations a été encaissé en 2024 sur le contrat C73736, et ce contrat prévoit-il une rente de conjoint ?"
+    route_attendue: hybride
+    forme: explicite
+    origine: review_hybrides_v0
+    note: "Somme fct__cotisations + absence de rente de conjoint au Résumé C73736."
+
+  - id: RT-H05
+    question: "Quel montant brut de capitaux décès a été versé en Métallurgie en 2025, et quelle clause bénéficiaire s'applique à défaut de désignation selon la Notice Métallurgie ?"
+    route_attendue: hybride
+    forme: explicite
+    origine: review_hybrides_v0
+    note: "Somme fct__paiements par segment + clause type de la Notice (distracteur clause personnalisée)."
+
+  - id: RT-H06
+    question: "Quel segment a enregistré le plus de décès survenus en 2025, et la clause bénéficiaire type de sa Notice reconnaît-elle le concubin ?"
+    route_attendue: hybride
+    forme: dependante
+    origine: review_hybrides_v0
+    note: "Le document à lire dépend du segment trouvé en SQL (SQL → RAG)."
+
+  - id: RT-H07
+    question: "Combien de contrats Enseignement privé sont actifs, et quelles garanties décès prévoit le contrat C83792 ?"
+    route_attendue: hybride
+    forme: explicite
+    origine: review_hybrides_v0
+    note: "Comptage dim__contrats + garanties décès du Résumé C83792."
+
+  - id: RT-H09
+    question: "Combien de dossiers invalidité en cours n'ont pas encore reçu le justificatif Sécurité sociale, et quelles pièces faut-il fournir pour un dossier invalidité ?"
+    route_attendue: hybride
+    forme: explicite
+    origine: review_hybrides_v0
+    note: "justif_ss_date NULL en base + Règlement Annexe I."
+
+  - id: RT-H10
+    question: "Quel contrat cadre a souscrit la garantie obsèques en option, et combien de ses assurés ont au moins un dossier ?"
+    route_attendue: hybride
+    forme: dependante
+    origine: review_hybrides_v0
+    note: "Le contrat vient des Résumés, puis sert de filtre SQL (RAG → SQL)."
+
+  - id: RT-H11
+    question: "Combien de dossiers incapacité sont en cours sur le contrat C87656, et quel taux d'indemnité journalière son Résumé prévoit-il sur la tranche A ?"
+    route_attendue: hybride
+    forme: explicite
+    origine: nouvelle
+    note: "Comptage fct__dossiers + taux IJ du Résumé C87656."
+
+  - id: RT-H12
+    question: "Combien de dossiers invalidité sont en cours sur le contrat C20077, et quel taux de rente son Résumé prévoit-il en 3e catégorie ?"
+    route_attendue: hybride
+    forme: explicite
+    origine: nouvelle
+    note: "Comptage fct__dossiers + taux du Résumé C20077."
+
+  - id: RT-H13
+    question: "Quel montant d'indemnités incapacité a été versé en 2024 sur le contrat C20077, et quelles démarches la FAQ demande-t-elle à un salarié de ce contrat en arrêt de travail ?"
+    route_attendue: hybride
+    forme: explicite
+    origine: nouvelle
+    note: "Somme fct__paiements + procédure de la FAQ."
+
+  - id: RT-H14
+    question: "Combien de dossiers décès compte chacun des contrats C20077 et C87656, et lequel des deux prévoit le capital décès le plus élevé pour un assuré marié sans personne à charge ?"
+    route_attendue: hybride
+    forme: explicite
+    origine: nouvelle
+    note: "Multi-documents : comptage par contrat + comparaison des Résumés C20077 et C87656."
+
+  - id: RT-H15
+    question: "Combien de dossiers incapacité sont en cours dans le segment Agriculture, et la franchise ITT du contrat C39949 diffère-t-elle de celle de la Notice Agriculture ?"
+    route_attendue: hybride
+    forme: explicite
+    origine: nouvelle
+    note: "Multi-documents : comptage par segment + écart Résumé C39949 / Notice Agriculture."
+
+  - id: RT-H16
+    question: "Quel est le total des prestations décès versées en 2025 dans le segment Santé et action sociale, et à qui revient le capital décès en l'absence de désignation selon la Notice de cette convention et selon le Règlement ?"
+    route_attendue: hybride
+    forme: explicite
+    origine: nouvelle
+    note: "Multi-documents : somme fct__paiements + clauses type Notice Santé et Règlement."
+
+  - id: RT-H17
+    question: "Les capitaux décès versés sur le contrat C20077 correspondent-ils aux taux prévus par son Résumé des garanties ?"
+    route_attendue: hybride
+    forme: implicite
+    origine: nouvelle
+    note: "Montants versés et salaires en base, taux (% du salaire) dans le Résumé : comparaison des deux."
+
+  - id: RT-H18
+    question: "Combien de temps après le début de leur arrêt les assurés en incapacité du contrat C73736 ont-ils commencé à être indemnisés, par rapport à ce que prévoit leur contrat ?"
+    route_attendue: hybride
+    forme: implicite
+    origine: nouvelle
+    note: "Délai fait générateur → premier paiement en base, franchise de 90 j au Résumé C73736."
+
+  - id: RT-H19
+    question: "Les rentes éducation versées en 2025 sur le contrat C83792 respectent-elles les taux prévus selon l'âge de l'enfant ?"
+    route_attendue: hybride
+    forme: implicite
+    origine: nouvelle
+    note: "Paiements et âge des bénéficiaires en base, barème par âge au Résumé C83792."
+
+  - id: RT-H20
+    question: "Quelle rente annuelle moyenne percevrait un invalide de 2e catégorie du contrat C39949, compte tenu du salaire de référence moyen des assurés invalides de ce contrat ?"
+    route_attendue: hybride
+    forme: implicite
+    origine: nouvelle
+    note: "Salaire moyen en base (fct__dossiers.salaire_montant) × taux 2e catégorie du Résumé C39949."
+
+  - id: RT-H21
+    question: "Combien d'assurés ont au moins un dossier sur les contrats dont le Résumé des garanties fixe une franchise ITT de 90 jours ?"
+    route_attendue: hybride
+    forme: dependante
+    origine: nouvelle
+    note: "La liste des contrats vient des Résumés, puis filtre le comptage SQL (RAG → SQL)."
+
+  # ---------------------------------------------------------------------------
+  # PIÈGES — 5 sql au vocabulaire documentaire, 5 rag à l'allure chiffrée
+  # (+ RT-S16, RT-S17 dans la section SQL : 7 pièges sql au total)
+  # ---------------------------------------------------------------------------
+
+  - id: RT-P01
+    question: "Combien de dossiers relevant de la garantie incapacité ont été ouverts en 2025 ?"
+    route_attendue: sql
+    forme: piege
+    origine: nouvelle
+    note: "« garantie incapacité » = risque Incapacité ; comptage en base, rien à lire."
+
+  - id: RT-P02
+    question: "Quel montant total a été versé au titre de la garantie décès en 2024 ?"
+    route_attendue: sql
+    forme: piege
+    origine: nouvelle
+    note: "« versé » = paiements effectifs (fct__paiements), pas le capital contractuel."
+
+  - id: RT-P03
+    question: "Combien de bénéficiaires de rente éducation sont rattachés à des dossiers encore en cours ?"
+    route_attendue: sql
+    forme: piege
+    origine: nouvelle
+    note: "dim__beneficiaires × fct__dossiers ; « bénéficiaires » et « rente éducation » sont aussi des termes du corpus."
+
+  - id: RT-P04
+    question: "Combien d'arrêts de travail pour maladie professionnelle sont encore en cours d'indemnisation ?"
+    route_attendue: sql
+    forme: piege
+    origine: nouvelle
+    note: "nature_arret + est_en_cours ; « arrêt de travail », « indemnisation » sont du vocabulaire de Notice."
+
+  - id: RT-P05
+    question: "Quelle est la durée moyenne des dossiers incapacité clos pour reprise du travail ?"
+    route_attendue: sql
+    forme: piege
+    origine: nouvelle
+    note: "etat_motif = REPRISE TRAVAIL + duree_dossier_jours ; durée observée, pas contractuelle."
+
+  - id: RT-P06
+    question: "Quel est le montant du capital obsèques prévu par le contrat C87656 ?"
+    route_attendue: rag
+    forme: piege
+    origine: nouvelle
+    note: "« montant » mais forfait contractuel du Résumé C87656 ; aucun capital obsèques distinct en base."
+
+  - id: RT-P07
+    question: "Quel taux de cotisation s'applique à la tranche B du personnel cadre sur le contrat C73736 ?"
+    route_attendue: rag
+    forme: piege
+    origine: nouvelle
+    note: "Taux au Résumé C73736 ; la base ne stocke que des montants de cotisation."
+
+  - id: RT-P08
+    question: "Combien de jours après la reprise du travail un nouvel arrêt est-il considéré comme une rechute ?"
+    route_attendue: rag
+    forme: piege
+    origine: nouvelle
+    note: "« Combien de jours » mais définition (60 j) identique dans Règlement et Notices."
+
+  - id: RT-P09
+    question: "Pendant combien de mois au maximum les garanties sont-elles maintenues au titre de la portabilité ?"
+    route_attendue: rag
+    forme: piege
+    origine: nouvelle
+    note: "Durée réglementaire (12 mois, FAQ), aucune donnée de portabilité en base."
+
+  - id: RT-P10
+    question: "De quel pourcentage le capital décès est-il majoré par enfant à charge sur la tranche C du contrat C39949 ?"
+    route_attendue: rag
+    forme: piege
+    origine: nouvelle
+    note: "Pourcentage contractuel du Résumé C39949, pas une statistique."

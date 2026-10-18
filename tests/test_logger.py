@@ -96,3 +96,22 @@ def test_champs_none(monkeypatch, tmp_path):
     assert row["sql_generated"] is None
     assert row["error_message"] is None
     assert row["eval_question_id"] is None
+
+
+def test_log_interaction_thinking_tokens_et_stop_reason(tmp_path, monkeypatch):
+    """Les tokens de raisonnement et le stop_reason sont loggés séparément."""
+
+    monkeypatch.setattr("src.config.LOGS_JSONL_PATH", tmp_path / "log.jsonl")
+    log_interaction(
+        question="q",
+        sql_generated=None,
+        status="success",
+        latency_ms=1,
+        input_tokens=10,
+        output_tokens=300,
+        cost_usd=0.0,
+        thinking_tokens=150,
+        stop_reason="end_turn",
+    )
+    row = json.loads((tmp_path / "log.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert row["thinking_tokens"] == 150 and row["stop_reason"] == "end_turn"

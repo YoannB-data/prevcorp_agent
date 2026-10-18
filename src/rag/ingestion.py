@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
+from src.config import QDRANT_PATH
 from src.rag.metadata import (
     build_chunk_header,
     doc_type_from_filename,
@@ -24,7 +25,6 @@ from src.rag.pdf_text import extract_text
 load_dotenv()
 
 CORPUS_DIR = Path(__file__).parent.parent.parent / "data" / "corpus" / "pdf"
-QDRANT_PATH = Path(__file__).parent.parent.parent / "qdrant_storage"
 COLLECTION_NAME = "prevcorp_docs"
 EMBEDDING_MODEL = "voyage-multilingual-2"
 CHUNK_SIZE = 150
