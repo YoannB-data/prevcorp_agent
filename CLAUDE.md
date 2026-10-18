@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Python 3.12 (pinned in `.python-version`)
 - **UV** is the package manager — use `uv` commands, not raw `pip`
-- Environment variables loaded from `.env` via python-dotenv; required: `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `MANIFEST_PATH`, `SEMANTIC_MANIFEST_PATH`, `DUCKDB_PATH`. Optional: `EDGE_BINARY` (full path to the Edge executable — only needed on machines without GTK3, as the fallback in `.claude/skills/corpus-generator/scripts/render.py` falls back to `"msedge"` on PATH otherwise, which fails with `FileNotFoundError` if Edge isn't on PATH). `.claude/skills/corpus-generator/scripts/render.py` calls `load_dotenv()` itself, so `EDGE_BINARY` is picked up from `.env` even when the script is invoked standalone, without relying on a manual export in the calling shell.
+- Environment variables loaded from `.env` via python-dotenv; required: `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `MANIFEST_PATH`, `SEMANTIC_MANIFEST_PATH`, `DUCKDB_PATH` (`.env.example` points the last three at the committed demo data in `data/demo/`). Optional: `AGENT_THINKING_MODE` (key of `MODEL_PARAMS[AGENT_MODEL].thinking_modes`, default `default`; an unknown value fails at import), `EDGE_BINARY` (full path to the Edge executable — only needed on machines without GTK3, as the fallback in `.claude/skills/corpus-generator/scripts/render.py` falls back to `"msedge"` on PATH otherwise, which fails with `FileNotFoundError` if Edge isn't on PATH). `.claude/skills/corpus-generator/scripts/render.py` calls `load_dotenv()` itself, so `EDGE_BINARY` is picked up from `.env` even when the script is invoked standalone, without relying on a manual export in the calling shell.
 
 ```bash
 uv sync --all-groups                             # install dependencies (incl. dev tools)
@@ -20,6 +20,8 @@ uv run python evals/sql/run_evals.py                 # run full SQL eval suite (
 uv run python evals/sql/run_evals.py --ids Q012 Q034 # run specific SQL evals by ID
 uv run python evals/rag/run_evals.py --ids RC01 # RAG eval (see RAG Evaluation)
 uv run python evals/rag/run_faithfulness.py --ids RC01           # faithfulness (collection header uniquement)
+uv run python evals/routing/run_routing.py --runs 3   # router eval (API cost); --from-json <f> regenerates the .md without API calls
+uv run python -m src.rag.ingestion [--collection NAME] [--recreate]  # (re)build the Qdrant index
 uv run pytest tests/test_scorers.py::test_piege_60_contre_90  # run a single test
 
 # Checks CI (critère d'arrêt, exactement ce périmètre)
@@ -45,7 +47,8 @@ src/
   app.py               # Streamlit UI: chat_input, history, sidebar with eval score
   router.py            # LLM call that classifies a question as "sql" or "rag"
   orchestrator.py      # orchestrator_main(): routes then delegates to sql_agent or rag.generator
-  config.py            # Settings: API keys, DB path, model, token costs, paths
+  config.py            # Settings: API keys, paths, per-role models, MODEL_PRICES / MODEL_PARAMS
+  llm.py               # extract_text() / extract_thinking_tokens() — use these to read API responses
   logger.py            # Appends interaction records to logs/interactions.jsonl
   structured/          # SQL pipeline (DuckDB / dbt-backed)
     sql_agent.py        # Claude API orchestration: agent_main(), retry loop, logging
@@ -77,11 +80,12 @@ evals/
     reports/              # Rapports par run (gitignored) + baselines/ (committed)
   reports/
     latest.json           # Dernier score SQL, lu par la sidebar Streamlit (seul fichier de ce dossier)
+  routing/              # Router evals: eval_set.yml (70 questions sql/rag/hybride), run_routing.py, metrics.py
+data/demo/             # Committed demo data: dev.duckdb, dbt manifests, Qdrant storage (config.QDRANT_PATH)
 data/corpus/
   src/                 # HTML source of each corpus document, committed to git — the real content asset (LLM-generated, non-deterministic), since eval questions reference exact values inside it
   pdf/                 # Generated PDFs (chunked for the RAG index) — gitignored, derivable from src/*.html via render.py; never the source of truth
-scripts/               # dump_chunks.py (read-only Qdrant chunk viewer); render.py lives in .claude/skills/corpus-generator/scripts/, not here
-qdrant_storage/        # Local (embedded) Qdrant collection, populated by src/rag/ingestion.py
+scripts/               # dump_chunks.py (read-only Qdrant chunk viewer), diag_croisement.py (retrieval diag on failing croisement questions); render.py lives in .claude/skills/corpus-generator/scripts/, not here
 logs/
   interactions.jsonl   # Append-only log: question, sql, status, tokens, cost, latency
 ```
@@ -100,16 +104,16 @@ logs/
 - `few_shot_bank.yml` is **reloaded on every call** to `agent_main` (no module-level cache) — changes take effect immediately without restart.
 - Schema comes from `manifest.json` (dbt nodes, `marts` layer only). Metrics come from `semantic_manifest.json` (dbt semantic layer). Both paths via env vars.
 - SQL must be wrapped in a ` ```sql ``` ` fence; `_extract_sql` raises `ValueError` otherwise.
-- Model: a single `MODEL` constant in `src/config.py` shared by the SQL agent, the router, and the RAG generator (check it there, not here), `MAX_TOKENS=1024`, `temperature=0` on the SQL agent and router. Prompt caching not yet implemented.
+- Models: three roles in `src/config.py` — `AGENT_MODEL` (SQL agent + RAG generator), `ROUTER_MODEL`, `JUDGE_MODEL` (check values there, not here). Every model used must appear in both `MODEL_PRICES` and `MODEL_PARAMS`, otherwise `src.config` raises at import. Never pass `max_tokens`/`temperature`/`thinking` by hand: use `agent_call_kwargs()` (agent) or `sampling_kwargs(model, t)` (router, judges), which drop `temperature` for models that reject it (Sonnet 5.5 returns 400 on non-default temperature). Read responses with `src/llm.py:extract_text()` — a thinking model can return no `text` block. Prompt caching not yet implemented.
 - `agent_main` accepts an optional `eval_question_id` for traceability in the JSONL log.
 - `LOGS_JSONL_PATH` (`logs/interactions.jsonl`) is relative to CWD — always launch from the project root.
 - `duckdb_executor.py` opens DuckDB in **read-only mode**; any write attempt raises an error at the DB level.
-- The RAG index (`qdrant_storage/`) is a local embedded Qdrant collection built by running `src/rag/ingestion.py` directly (`ingest_corpus()`); it is not rebuilt automatically when `data/corpus/pdf/` changes. Point IDs are deterministic hashes of `filename_chunkindex`, so re-ingestion is idempotent.
+- The RAG index is a local embedded Qdrant store at `config.QDRANT_PATH` = `data/demo/qdrant_storage/` (committed; the root-level `qdrant_storage/` is gitignored and unused), built by `python -m src.rag.ingestion`; it is not rebuilt automatically when `data/corpus/pdf/` changes. Point IDs are deterministic hashes of `filename_chunkindex`, so re-ingestion is idempotent.
 - `qdrant_client.query_points()` is the current API — `.search()` is deprecated as of qdrant-client 1.18 and removed in later versions. `retriever.py` already uses `query_points()`; don't regress to `.search()` when refactoring.
 - `doc_id` is the stable key of a corpus document (stored in each chunk payload). `retrieve()` raises `ValueError` if a chunk has no `doc_id`: the collection was ingested before `doc_id` existed and must be re-ingested (`src/rag/ingestion.py`).
 - On process exit, Python may print `ImportError: sys.meta_path is None` originating from `portalocker` during `QdrantClient` garbage collection. This is cosmetic (an interpreter-shutdown artifact of the local/embedded Qdrant client) — ignore it, it does not indicate a real failure.
 - The `corpus-generator` skill (`.claude/skills/corpus-generator/`) internally calls `.claude/skills/corpus-generator/scripts/render.py`, which converts HTML to PDF via weasyprint and writes it to `data/corpus/pdf/` as `<TYPE>_<identifiant>.pdf` (prefix mapping in `_TYPE_PREFIXES`). If a generated PDF has an inconsistent name or lands in the wrong place, the bug is most likely in `build_filename()` or in the `corpus_dir` path passed to the script — not in the skill itself.
-- **Standing environment constraint, not a temporary fix**: on this machine, GTK3 cannot be installed, so `render.py` cannot use weasyprint directly — same category of constraint as the Qdrant local-mode decision above (corporate environment limits the ideal setup). `render.py` should detect the missing GTK3 dependency and fall back automatically to a headless-browser print-to-pdf (e.g. `msedge --headless --print-to-pdf=<out>.pdf <in>.html`) rather than relying on manually re-instructing each session to do so. The two engines (WeasyPrint vs. Chromium) don't guarantee identical rendering of table borders, page breaks, or column widths — spot-check a generated PDF visually after implementing the fallback, and note the standing constraint here rather than re-discovering it each session.
+- **Standing environment constraint, not a temporary fix**: on this machine, GTK3 cannot be installed, so `render.py` cannot use weasyprint directly — same category of constraint as the Qdrant local-mode decision above (corporate environment limits the ideal setup). `render.py` detects the missing GTK3 dependency (`_weasyprint_available()`) and falls back automatically to `msedge --headless --print-to-pdf` (`_render_with_edge_fallback()`, binary overridable via `EDGE_BINARY`). The two engines (WeasyPrint vs. Chromium) don't guarantee identical rendering of table borders, page breaks, or column widths — spot-check generated PDFs visually.
 
 ## Database Schema
 
@@ -133,6 +137,10 @@ Each run writes a timestamped report to `evals/sql/reports/`. After a full run, 
 
 Run evals after significant changes to `src/structured/sql_agent.py`, `src/structured/schema_loader.py`, or `src/prompts/system_prompt.md`.
 
+
+## Routing Evaluation
+
+`evals/routing/run_routing.py` measures only the route **label** (`sql` / `rag`) of `router.route()` over `evals/routing/eval_set.yml` (70 questions; expected route `sql`, `rag` or `hybride`, the latter tracked via `rappel_hybride` and per-`forme` stats), averaged over `--runs` runs. A router reply outside `sql`/`rag` is scored as `erreur`; API exceptions propagate. Baseline in `evals/routing/reports/baselines/`.
 
 ## RAG Evaluation
 
