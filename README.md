@@ -6,7 +6,11 @@ Chaque réponse est traçable (SQL affiché, documents cités), et chaque compos
 
 **[▶ Démo en ligne](https://prevcorp-agent.streamlit.app/)** : si l'app dort, cliquez pour la réveiller (environ 30 secondes).
 
-![Démo PrevCorp](docs/demo.gif)
+
+
+https://github.com/user-attachments/assets/08feee6b-89a1-4c2a-a8d6-c8bbde7a89c5
+
+
 
 > Données et documents **100 % synthétiques**. La structure s'inspire de documents publics du secteur
 > (notices d'information, tableaux de garanties, conventions collectives) ; le contenu est intégralement généré.
