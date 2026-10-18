@@ -29,7 +29,7 @@ Exécution DuckDB (lecture seule)
        ↓
 Résultat (DataFrame) + graphique Plotly
        ↓
-Log JSONL (tokens, latence, coût)
+Log JSONL (tokens, latence, coût) — seul le pipeline SQL est journalisé
 ```
 
 Pipeline RAG :
@@ -47,7 +47,7 @@ Appel Claude → réponse avec citations des sources
 - Python 3.12
 - [UV](https://docs.astral.sh/uv/) comme gestionnaire de paquets
 - Clés API Anthropic et Voyage
-- Base DuckDB + manifests dbt compilés (`manifest.json` et `semantic_manifest.json`)
+- Base DuckDB + manifests dbt compilés (`manifest.json` et `semantic_manifest.json`) : une version de démo est versionnée dans `data/demo/`
 
 ## Installation
 
@@ -116,10 +116,11 @@ Les résultats sont écrits dans `evals/sql/reports/` (Markdown horodaté) et `e
 ### RAG
 
 ```bash
-uv run python evals/rag/run_evals.py [--k 5] [--ids RC01 ...]
+uv run python evals/rag/run_evals.py [--k 5] [--variant header] [--judge-model MODELE] [--ids RC01 ...]
+uv run python evals/rag/run_faithfulness.py [--k 5] [--judge-model MODELE] [--ids RC01 ...]
 ```
 
-Chaque question de `evals/rag/eval_set.yml` est évaluée en retrieval (R), de bout en bout (E) et en génération isolée (I). Rapports dans `evals/rag/reports/`. Ne pas lancer pendant que Streamlit tourne (verrou disque Qdrant) ; les appels Voyage et Anthropic sont facturés.
+Chaque question de `evals/rag/eval_set.yml` est évaluée en retrieval (R), de bout en bout (E) et en génération isolée (I). `run_faithfulness.py` mesure, via un juge LLM, la part des affirmations de chaque réponse appuyées par les chunks récupérés. Les deux runners refusent de tourner (code 2) si la collection Qdrant n'a pas été ingérée avec la variante `header`. Rapports dans `evals/rag/reports/`. Ne pas lancer pendant que Streamlit tourne (verrou disque Qdrant) ; les appels Voyage et Anthropic sont facturés.
 
 Historique des jeux de questions RAG et de leurs hashes : [evals/rag/CHANGELOG.md](evals/rag/CHANGELOG.md).
 
@@ -189,7 +190,7 @@ data/corpus/
   pdf/                 # PDF du corpus (gitignorés, dérivés de src/)
 scripts/               # dump_chunks.py (lecture des chunks Qdrant), diag_croisement.py (diagnostic retrieval)
 logs/
-  interactions.jsonl   # Historique de toutes les interactions
+  interactions.jsonl   # Historique des appels du pipeline SQL (succès et erreurs)
 ```
 
 ## Schéma de données
@@ -210,6 +211,9 @@ Base en étoile :
 - [DuckDB](https://duckdb.org/) — moteur SQL embarqué
 - [Plotly](https://plotly.com/python/) — visualisations automatiques
 - [pandas](https://pandas.pydata.org/) — manipulation des résultats
+- [pdfplumber](https://github.com/jsvine/pdfplumber) — extraction du texte des PDF du corpus
+- [Pydantic](https://docs.pydantic.dev/) — résultat unifié de l'orchestrateur
+- [WeasyPrint](https://weasyprint.org/) — rendu HTML → PDF du corpus (repli sur Edge headless sans GTK3)
 - [Ruff](https://github.com/astral-sh/ruff) — formatter + linter (remplace black, isort, flake8)
 - [mypy](https://mypy-lang.org/) — type checking statique
 - [pre-commit](https://pre-commit.com/) — hooks git locaux
